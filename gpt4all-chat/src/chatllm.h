@@ -153,8 +153,6 @@ public:
     static void destroyStore();
     bool isModelLoaded() const;
     void regenerateResponse();
-    void resetResponse();
-    void resetContext();
 
     void stopGenerating() { m_stopGenerating = true; }
 
@@ -163,8 +161,6 @@ public:
     void requestTrySwitchContext();
     void setForceUnloadModel(bool b) { m_forceUnloadModel = b; }
     void setMarkedForDeletion(bool b) { m_markedForDeletion = b; }
-
-    QString response(bool trim = true) const;
 
     ModelInfo modelInfo() const;
     void setModelInfo(const ModelInfo &info);
@@ -193,13 +189,11 @@ public:
         return m_llModelInfo.fallbackReason.value_or(u""_s);
     }
 
-    QString generatedName() const { return m_nameResponse; }
-
     bool serialize(QDataStream &stream, int version);
-    bool deserialize(QDataStream &stream, int version, bool deserializeKV);
+    bool deserialize(QDataStream &stream, int version);
 
 public Q_SLOTS:
-    bool prompt(const QList<QString> &collectionList, const QString &prompt);
+    void prompt(QStringView prompt, const QStringList &enabledCollections);
     bool loadDefaultModel();
     void trySwitchContextOfLoadedModel(const ModelInfo &modelInfo);
     bool loadModel(const ModelInfo &modelInfo);
@@ -238,6 +232,14 @@ Q_SIGNALS:
     void modelInfoChanged(const ModelInfo &modelInfo);
 
 protected:
+    struct PromptResult {
+        QByteArray response; // raw UTF-8
+        quint32    promptTokens; // note: counts *entire* history, even if cached
+        quint32    responseTokens;
+    };
+
+    auto promptInternal(QStringView prompt, const QStringList &enabledCollections, const LLModel::PromptContext &ctx)
+        -> std::optional<PromptResult>;
     bool promptInternal(const QList<QString> &collectionList, const QString &prompt, const QString &promptTemplate,
         int32_t n_predict, int32_t top_k, float top_p, float min_p, float temp, int32_t n_batch, float repeat_penalty,
         int32_t repeat_penalty_tokens, std::optional<QString> fakeReply = {});
@@ -248,19 +250,11 @@ protected:
     bool handleQuestionPrompt(int32_t token);
     bool handleQuestionResponse(int32_t token, const std::string &response);
 
-protected:
-    LLModel::PromptContext m_ctx;
-    quint32 m_promptTokens;
-    quint32 m_promptResponseTokens;
-
 private:
     bool loadNewModel(const ModelInfo &modelInfo, QVariantMap &modelLoadProps);
 
+private:
     const Chat *m_chat;
-    QString m_response;
-    QString m_trimmedResponse;
-    QString m_nameResponse;
-    QString m_questionResponse;
     LLModelInfo m_llModelInfo;
     LLModelTypeV1 m_llModelType = LLModelTypeV1::NONE;
     ModelInfo m_modelInfo;

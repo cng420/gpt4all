@@ -89,7 +89,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         'importlib_resources; python_version < "3.9"',
-        'jinja2~=3.1'
+        'jinja2~=3.1',
         'requests',
         'tqdm',
         'typing-extensions>=4.3.0; python_version >= "3.9" and python_version < "3.11"',

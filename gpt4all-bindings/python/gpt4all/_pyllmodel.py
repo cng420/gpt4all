@@ -116,16 +116,16 @@ llmodel = load_llmodel_library()
 
 class LLModelPromptContext(ctypes.Structure):
     _fields_ = [
-        ("n_min_predict", ctypes.c_int32),
-        ("n_predict", ctypes.c_int32),
-        ("top_k", ctypes.c_int32),
-        ("top_p", ctypes.c_float),
-        ("min_p", ctypes.c_float),
-        ("temp", ctypes.c_float),
-        ("n_batch", ctypes.c_int32),
+        ("n_min_predict",  ctypes.c_int32),
+        ("n_predict",      ctypes.c_int32),
+        ("top_k",          ctypes.c_int32),
+        ("top_p",          ctypes.c_float),
+        ("min_p",          ctypes.c_float),
+        ("temp",           ctypes.c_float),
+        ("n_batch",        ctypes.c_int32),
         ("repeat_penalty", ctypes.c_float),
-        ("repeat_last_n", ctypes.c_int32),
-        ("context_erase", ctypes.c_float),
+        ("repeat_last_n",  ctypes.c_int32),
+        ("context_erase",  ctypes.c_float),
     ]
 
 
@@ -166,8 +166,8 @@ llmodel.llmodel_prompt.argtypes = [
     ctypes.c_char_p,
     PromptCallback,
     ResponseCallback,
-    ctypes.c_bool,
     ctypes.POINTER(LLModelPromptContext),
+    ctypes.c_bool,
     ctypes.POINTER(ctypes.c_char_p),
 ]
 
@@ -453,7 +453,6 @@ class LLModel:
         repeat_last_n   : int                  = 10,
         context_erase   : float                = 0.75,
         reset_context   : bool                 = False,
-        special         : bool                 = False,
     ):
         """
         Generate response from model from a prompt.
@@ -500,9 +499,8 @@ class LLModel:
             ctypes.c_char_p(prompt.encode()),
             PromptCallback(self._prompt_callback),
             ResponseCallback(self._callback_decoder(callback)),
-            True,
             context,
-            special,
+            True,
             ctypes.byref(err),
         ):
             s = err.value

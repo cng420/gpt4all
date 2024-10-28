@@ -25,7 +25,7 @@ class LLModel {
 public:
     using Token = int32_t;
     using PromptCallback      = std::function<bool(std::span<const Token> batch, bool cached)>;
-    using ResponseCallback    = std::function<bool(Token token, std::string_view response)>;
+    using ResponseCallback    = std::function<bool(Token token, std::string_view piece)>;
     using EmbedCancelCallback = bool(unsigned *batchSizes, unsigned nBatch, const char *backend);
     using ProgressCallback    = std::function<bool(float progress)>;
 
@@ -128,7 +128,7 @@ public:
     };
 
     struct PromptContext {
-        int32_t n_min_predict = 4;
+        int32_t n_min_predict = 4; // minimum amount of free space, less will throw an exception
         int32_t n_predict = 200;
         int32_t top_k = 40;
         float   top_p = 0.9f;
@@ -159,19 +159,19 @@ public:
     virtual void prompt(std::string_view        prompt,
                         const PromptCallback   &promptCallback,
                         const ResponseCallback &responseCallback,
-                        bool                    allowContextShift,
-                        const PromptContext    &ctx);
+                        const PromptContext    &ctx,
+                        bool                    allowContextShift = true);
 
     virtual size_t embeddingSize() const {
         throw std::logic_error(std::string(implementation().modelType()) + " does not support embeddings");
     }
     // user-specified prefix
-    virtual void embed(const std::vector<std::string> &texts, float *embeddings, std::optional<std::string> prefix,
+    virtual void embed(std::span<const std::string> texts, float *embeddings, std::optional<std::string> prefix,
                        int dimensionality = -1, size_t *tokenCount = nullptr, bool doMean = true, bool atlas = false,
                        EmbedCancelCallback *cancelCb = nullptr);
     // automatic prefix
-    virtual void embed(const std::vector<std::string> &texts, float *embeddings, bool isRetrieval,
-                       int dimensionality = -1, size_t *tokenCount = nullptr, bool doMean = true, bool atlas = false);
+    virtual void embed(std::span<const std::string> texts, float *embeddings, bool isRetrieval, int dimensionality = -1,
+                       size_t *tokenCount = nullptr, bool doMean = true, bool atlas = false);
 
     virtual void setThreadCount(int32_t n_threads) { (void)n_threads; }
     virtual int32_t threadCount() const { return 1; }

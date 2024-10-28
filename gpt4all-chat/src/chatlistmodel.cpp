@@ -259,7 +259,11 @@ void ChatsRestoreThread::run()
 
         Chat *chat = new Chat;
         chat->moveToThread(qGuiApp->thread());
-        if (!chat->deserialize(in, version)) {
+        bool ok = !chat->deserialize(in, version);
+        if (ok && !in.atEnd()) {
+            qWarning().nospace() << "error loading chat from " << file.fileName() << ": extra data at end of file";
+        }
+        if (!ok) {
             qWarning() << "ERROR: Couldn't deserialize chat from file:" << file.fileName();
         } else {
             emit chatRestored(chat);

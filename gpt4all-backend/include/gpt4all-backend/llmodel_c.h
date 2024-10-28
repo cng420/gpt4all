@@ -35,15 +35,16 @@ typedef int32_t token_t;
  * behavior.
  */
 struct llmodel_prompt_context {
+    int32_t n_min_predict;  // minimum amount of free space, less will return an error
     int32_t n_predict;      // number of tokens to predict
     int32_t top_k;          // top k logits to sample from
-    float top_p;            // nucleus sampling probability threshold
-    float min_p;            // Min P sampling
-    float temp;             // temperature to adjust model's output distribution
+    float   top_p;          // nucleus sampling probability threshold
+    float   min_p;          // Min P sampling
+    float   temp;           // temperature to adjust model's output distribution
     int32_t n_batch;        // number of predictions to generate in parallel
-    float repeat_penalty;   // penalty factor for repeated tokens
+    float   repeat_penalty; // penalty factor for repeated tokens
     int32_t repeat_last_n;  // last n tokens to penalize
-    float context_erase;    // percent of context to erase if we exceed the context window
+    float   context_erase;  // percent of context to erase if we exceed the context window
 };
 
 struct llmodel_gpu_device {
@@ -186,16 +187,16 @@ uint64_t llmodel_state_set_data(llmodel_model model, const uint8_t *state, uint6
  * @param prompt A string representing the input prompt.
  * @param prompt_callback A callback function for handling the processing of prompt.
  * @param response_callback A callback function for handling the generated response.
- * @param allow_context_shift Whether to allow shifting of context to make room for more input.
  * @param ctx A pointer to the llmodel_prompt_context structure.
+ * @param allow_context_shift Whether to allow shifting of context to make room for more input.
  * @param error A pointer to a string; will only be set on error.
  */
 bool llmodel_prompt(llmodel_model               model,
                     const char                 *prompt,
                     llmodel_prompt_callback     prompt_callback,
                     llmodel_response_callback   response_callback,
-                    bool                        allow_context_shift,
                     llmodel_prompt_context     *ctx,
+                    bool                        allow_context_shift,
                     const char                **error);
 
 /**

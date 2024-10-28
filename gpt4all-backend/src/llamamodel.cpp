@@ -522,7 +522,7 @@ std::vector<LLModel::Token> LLamaModel::tokenize(std::string_view str)
 {
     std::vector<LLModel::Token> fres(str.length() + 4);
     int32_t fres_len = llama_tokenize_gpt4all(
-        d_ptr->model, str.data(), str.length(), fres.data(), fres.size(), /*add_special*/ true,
+        d_ptr->model, str.data(), str.length(), fres.data(), fres.size(), /*add_special*/ false,
         /*parse_special*/ true, /*insert_space*/ true // TODO: remove insert_space from llama.cpp
     );
     fres.resize(fres_len);
@@ -599,6 +599,8 @@ LLModel::Token LLamaModel::sampleToken() const
 
 bool LLamaModel::evalTokens(int32_t nPast, std::span<const Token> tokens) const
 {
+    assert(!tokens.empty());
+
     llama_kv_cache_seq_rm(d_ptr->ctx, 0, nPast, -1);
 
     llama_batch batch = llama_batch_init(tokens.size(), 0, 1);
@@ -957,7 +959,7 @@ static const EmbModelSpec *getEmbedSpec(const std::string &modelName) {
 }
 
 void LLamaModel::embed(
-    const std::vector<std::string> &texts, float *embeddings, bool isRetrieval, int dimensionality, size_t *tokenCount,
+    std::span<const std::string> texts, float *embeddings, bool isRetrieval, int dimensionality, size_t *tokenCount,
     bool doMean, bool atlas
 ) {
     const EmbModelSpec *spec;
@@ -969,7 +971,7 @@ void LLamaModel::embed(
 }
 
 void LLamaModel::embed(
-    const std::vector<std::string> &texts, float *embeddings, std::optional<std::string> prefix, int dimensionality,
+    std::span<const std::string> texts, float *embeddings, std::optional<std::string> prefix, int dimensionality,
     size_t *tokenCount, bool doMean, bool atlas, LLModel::EmbedCancelCallback *cancelCb
 ) {
     if (!d_ptr->model)
@@ -1027,8 +1029,8 @@ double getL2NormScale(T *start, T *end)
 }
 
 void LLamaModel::embedInternal(
-    const std::vector<std::string> &texts, float *embeddings, std::string prefix, int dimensionality,
-    size_t *tokenCount, bool doMean, bool atlas, LLModel::EmbedCancelCallback *cancelCb, const EmbModelSpec *spec
+    std::span<const std::string> texts, float *embeddings, std::string prefix, int dimensionality, size_t *tokenCount,
+    bool doMean, bool atlas, LLModel::EmbedCancelCallback *cancelCb, const EmbModelSpec *spec
 ) {
     typedef std::vector<LLModel::Token> TokenString;
     static constexpr int32_t atlasMaxLength = 8192;
@@ -1048,7 +1050,7 @@ void LLamaModel::embedInternal(
 
         tokens.resize(text.length()+4);
         int32_t n_tokens = llama_tokenize_gpt4all(
-            d_ptr->model, text.c_str(), text.length(), tokens.data(), tokens.size(), /*add_special*/ wantBOS,
+            d_ptr->model, text.data(), text.size(), tokens.data(), tokens.size(), /*add_special*/ wantBOS,
             /*parse_special*/ false, /*insert_space*/ false
         );
         if (n_tokens) {

@@ -12,7 +12,7 @@ import warnings
 from contextlib import contextmanager
 from pathlib import Path
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Iterable, Literal, Protocol, overload
+from typing import TYPE_CHECKING, Any, Iterable, Literal, Protocol, TypedDict, overload
 
 import jinja2
 import requests
@@ -34,7 +34,11 @@ DEFAULT_MODEL_DIRECTORY = Path.home() / ".cache" / "gpt4all"
 
 ConfigType: TypeAlias = "dict[str, Any]"
 
-_jinja_env = jinja2.Environment(loader=jinja2.BaseLoader())
+_jinja_env = jinja2.Environment(
+    loader=jinja2.BaseLoader(),
+    trim_blocks=True,
+    lstrip_blocks=True,
+)
 
 
 class MessageType(TypedDict):
@@ -318,7 +322,7 @@ class GPT4All:
         config: ConfigType = {}
         if allow_download:
             models = cls.list_models()
-            if (model := next((m for m in models if m["filename"] == model_filename), None) is not None:
+            if (model := next((m for m in models if m["filename"] == model_filename), None)) is not None:
                 config.update(model)
 
         # Validate download directory
@@ -551,11 +555,13 @@ class GPT4All:
         if streaming:
             def stream() -> Iterator[str]:
                 yield from self.model.prompt_model_streaming(prompt, _callback_wrapper, **generate_kwargs)
-                self._history.append(MessageType(role="assistant", content=full_response))
+                if self._history is not None:
+                    self._history.append(MessageType(role="assistant", content=full_response))
             return stream()
 
         self.model.prompt_model(prompt, _callback_wrapper, **generate_kwargs)
-        self._history.append(MessageType(role="assistant", content=full_response))
+        if self._history is not None:
+            self._history.append(MessageType(role="assistant", content=full_response))
         return full_response
 
     @contextmanager

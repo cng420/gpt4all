@@ -41,11 +41,11 @@ public:
 
     size_t embeddingSize() const override;
     // user-specified prefix
-    void embed(const std::vector<std::string> &texts, float *embeddings, std::optional<std::string> prefix,
+    void embed(std::span<const std::string> texts, float *embeddings, std::optional<std::string> prefix,
                int dimensionality = -1, size_t *tokenCount = nullptr, bool doMean = true, bool atlas = false,
                EmbedCancelCallback *cancelCb = nullptr) override;
     // automatic prefix
-    void embed(const std::vector<std::string> &texts, float *embeddings, bool isRetrieval, int dimensionality = -1,
+    void embed(std::span<const std::string> texts, float *embeddings, bool isRetrieval, int dimensionality = -1,
                size_t *tokenCount = nullptr, bool doMean = true, bool atlas = false) override;
 
     int32_t contextLength() const override;
@@ -68,7 +68,7 @@ protected:
     int32_t maxContextLength(std::string const &modelPath) const override;
     int32_t layerCount(std::string const &modelPath) const override;
 
-    void embedInternal(const std::vector<std::string> &texts, float *embeddings, std::string prefix, int dimensionality,
+    void embedInternal(std::span<const std::string> texts, float *embeddings, std::string prefix, int dimensionality,
                        size_t *tokenCount, bool doMean, bool atlas, EmbedCancelCallback *cancelCb,
                        const EmbModelSpec *spec);
 

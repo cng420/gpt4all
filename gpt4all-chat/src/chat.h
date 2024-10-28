@@ -143,7 +143,7 @@ Q_SIGNALS:
     void responseChanged();
     void responseInProgressChanged();
     void responseStateChanged();
-    void promptRequested(const QList<QString> &collectionList, const QString &prompt);
+    void promptRequested(QStringView prompt, const QStringList &enabledCollections);
     void regenerateResponseRequested();
     void resetResponseRequested();
     void resetContextRequested();

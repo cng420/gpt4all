@@ -38,7 +38,7 @@ Chat::Chat(server_tag_t, QObject *parent)
     , m_chatModel(new ChatModel(this))
     , m_responseState(Chat::ResponseStopped)
     , m_creationDate(QDateTime::currentSecsSinceEpoch())
-    , m_llmodel(new Server(this))
+    , m_llmodel(nullptr) // TODO(jared): new Server(this)
     , m_isServer(true)
     , m_collectionModel(new LocalDocsCollectionsModel(this))
 {
@@ -74,8 +74,6 @@ void Chat::connectLLM()
     connect(this, &Chat::loadDefaultModelRequested, m_llmodel, &ChatLLM::loadDefaultModel, Qt::QueuedConnection);
     connect(this, &Chat::generateNameRequested, m_llmodel, &ChatLLM::generateName, Qt::QueuedConnection);
     connect(this, &Chat::regenerateResponseRequested, m_llmodel, &ChatLLM::regenerateResponse, Qt::QueuedConnection);
-    connect(this, &Chat::resetResponseRequested, m_llmodel, &ChatLLM::resetResponse, Qt::QueuedConnection);
-    connect(this, &Chat::resetContextRequested, m_llmodel, &ChatLLM::resetContext, Qt::QueuedConnection);
 
     connect(this, &Chat::collectionListChanged, m_collectionModel, &LocalDocsCollectionsModel::setCollections);
 }
@@ -85,7 +83,6 @@ void Chat::reset()
     stopGenerating();
     // Erase our current on disk representation as we're completely resetting the chat along with id
     ChatListModel::globalInstance()->removeChatFile(this);
-    emit resetContextRequested();
     m_id = Network::globalInstance()->generateUniqueId();
     emit idChanged(m_id);
     // NOTE: We deliberately do no reset the name or creation date to indicate that this was originally
@@ -149,7 +146,6 @@ void Chat::newPromptResponsePair(const QString &prompt, const QList<QUrl> &attac
         promptPlusAttached = attachedContexts.join("\n\n") + "\n\n" + prompt;
 
     newPromptResponsePairInternal(prompt, attachments);
-    emit resetResponseRequested();
 
     this->prompt(promptPlusAttached);
 }
@@ -157,14 +153,12 @@ void Chat::newPromptResponsePair(const QString &prompt, const QList<QUrl> &attac
 void Chat::prompt(const QString &prompt)
 {
     resetResponseState();
-    emit promptRequested(m_collections, prompt);
+    emit promptRequested(prompt, m_collections);
     m_needsSave = true;
 }
 
 void Chat::regenerateResponse()
 {
-    const int index = m_chatModel->count() - 1;
-    m_chatModel->updateSources(index, QList<ResultInfo>());
     emit regenerateResponseRequested();
     m_needsSave = true;
 }
@@ -451,12 +445,8 @@ bool Chat::deserialize(QDataStream &stream, int version)
         emit collectionListChanged(m_collections);
     }
 
-    bool deserializeKV = true;
-    if (version >= 6)
-        stream >> deserializeKV;
-
     m_llmodel->setModelInfo(m_modelInfo);
-    if (!m_llmodel->deserialize(stream, version, deserializeKV))
+    if (!m_llmodel->deserialize(stream, version))
         return false;
     if (!m_chatModel->deserialize(stream, version))
         return false;

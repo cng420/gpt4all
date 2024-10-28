@@ -197,7 +197,8 @@ qt_add_executable(chat
     src/modellist.cpp             src/modellist.h
     src/mysettings.cpp            src/mysettings.h
     src/network.cpp               src/network.h
-    src/server.cpp                src/server.h
+    # TODO: implement using Jinja
+    # src/server.cpp                src/server.h
     src/xlsxtomd.cpp              src/xlsxtomd.h
     ${CHAT_EXE_RESOURCES}
     ${MACOS_SOURCES}

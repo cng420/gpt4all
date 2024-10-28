@@ -73,8 +73,8 @@ public:
     void prompt(std::string_view        prompt,
                 const PromptCallback   &promptCallback,
                 const ResponseCallback &responseCallback,
-                bool                    allowContextShift,
-                const PromptContext    &ctx) override;
+                const PromptContext    &ctx,
+                bool                    allowContextShift = true) override;
 
     void setThreadCount(int32_t n_threads) override;
     int32_t threadCount() const override;

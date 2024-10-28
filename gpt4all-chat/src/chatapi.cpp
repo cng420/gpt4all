@@ -71,8 +71,8 @@ void ChatAPI::prompt(
     std::string_view        prompt,
     const PromptCallback   &promptCallback,
     const ResponseCallback &responseCallback,
-    bool                    allowContextShift,
-    const PromptContext    &promptCtx
+    const PromptContext    &promptCtx,
+    bool                    allowContextShift
 ) {
     Q_UNUSED(promptCallback);
     Q_UNUSED(allowContextShift);

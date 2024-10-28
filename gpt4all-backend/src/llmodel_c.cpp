@@ -130,13 +130,14 @@ bool llmodel_prompt(llmodel_model               model,
                     const char                 *prompt,
                     llmodel_prompt_callback     prompt_callback,
                     llmodel_response_callback   response_callback,
-                    bool                        allow_context_shift,
                     llmodel_prompt_context     *ctx,
+                    bool                        allow_context_shift,
                     const char                **error)
 {
     auto *wrapper = static_cast<LLModelWrapper *>(model);
 
     // Copy the C prompt context
+    wrapper->promptContext.n_min_predict  = ctx->n_min_predict;
     wrapper->promptContext.n_predict      = ctx->n_predict;
     wrapper->promptContext.top_k          = ctx->top_k;
     wrapper->promptContext.top_p          = ctx->top_p;
@@ -150,13 +151,13 @@ bool llmodel_prompt(llmodel_model               model,
     auto prompt_func = [prompt_callback](std::span<const LLModel::Token> token_ids, bool cached) {
         return prompt_callback(token_ids.data(), token_ids.size(), cached);
     };
-    auto response_func = [response_callback](LLModel::Token token_id, std::string_view response) {
-        return response_callback(token_id, response.data());
+    auto response_func = [response_callback](LLModel::Token token_id, std::string_view piece) {
+        return response_callback(token_id, piece.data());
     };
 
     // Call the C++ prompt method
     try {
-        wrapper->llModel->prompt(prompt, prompt_func, response_func, allow_context_shift, wrapper->promptContext);
+        wrapper->llModel->prompt(prompt, prompt_func, response_func, wrapper->promptContext, allow_context_shift);
     } catch (std::exception const &e) {
         llmodel_set_error(error, e.what());
         return false;

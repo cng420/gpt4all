@@ -23,13 +23,15 @@ void LLModel::prompt(
     std::string_view        prompt,
     const PromptCallback   &promptCallback,
     const ResponseCallback &responseCallback,
-    bool                    allowContextShift,
-    const PromptContext    &promptCtx
+    const PromptContext    &promptCtx,
+    bool                    allowContextShift
 ) {
     if (!isModelLoaded())
         throw std::invalid_argument("Attempted to prompt an unloaded model.");
     if (!supportsCompletion())
         throw std::invalid_argument("Not a text completion model.");
+    if (!promptCtx.n_batch)
+        throw std::invalid_argument("Batch size cannot be zero.");
     if (!promptCtx.n_predict)
         return; // nothing requested
 
@@ -262,7 +264,7 @@ void LLModel::generateResponse(
 }
 
 void LLModel::embed(
-    const std::vector<std::string> &texts, float *embeddings, std::optional<std::string> prefix, int dimensionality,
+    std::span<const std::string> texts, float *embeddings, std::optional<std::string> prefix, int dimensionality,
     size_t *tokenCount, bool doMean, bool atlas, EmbedCancelCallback *cancelCb
 ) {
     (void)texts;
@@ -277,7 +279,7 @@ void LLModel::embed(
 }
 
 void LLModel::embed(
-    const std::vector<std::string> &texts, float *embeddings, bool isRetrieval, int dimensionality, size_t *tokenCount,
+    std::span<const std::string> texts, float *embeddings, bool isRetrieval, int dimensionality, size_t *tokenCount,
     bool doMean, bool atlas
 ) {
     (void)texts;

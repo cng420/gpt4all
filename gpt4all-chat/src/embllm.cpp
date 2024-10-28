@@ -176,7 +176,7 @@ bool EmbeddingLLMWorker::loadModel()
     return true;
 }
 
-std::vector<float> EmbeddingLLMWorker::generateQueryEmbedding(const QString &text)
+std::vector<float> EmbeddingLLMWorker::generateQueryEmbedding(QStringView text)
 {
     {
         QMutexLocker locker(&m_mutex);
@@ -190,7 +190,9 @@ std::vector<float> EmbeddingLLMWorker::generateQueryEmbedding(const QString &tex
             std::vector<float> embedding(m_model->embeddingSize());
 
             try {
-                m_model->embed({text.toStdString()}, embedding.data(), /*isRetrieval*/ true);
+                auto textUtf8 = text.toUtf8();
+                std::string str(textUtf8.begin(), textUtf8.end());
+                m_model->embed({ &str, 1 }, embedding.data(), /*isRetrieval*/ true);
             } catch (const std::exception &e) {
                 qWarning() << "WARNING: LLModel::embed failed:" << e.what();
                 return {};
@@ -226,7 +228,7 @@ void EmbeddingLLMWorker::sendAtlasRequest(const QStringList &texts, const QStrin
     connect(reply, &QNetworkReply::finished, this, &EmbeddingLLMWorker::handleFinished);
 }
 
-void EmbeddingLLMWorker::atlasQueryEmbeddingRequested(const QString &text)
+void EmbeddingLLMWorker::atlasQueryEmbeddingRequested(QStringView text)
 {
     {
         QMutexLocker locker(&m_mutex);
@@ -243,7 +245,7 @@ void EmbeddingLLMWorker::atlasQueryEmbeddingRequested(const QString &text)
         Q_ASSERT(hasModel());
     }
 
-    sendAtlasRequest({text}, "search_query");
+    sendAtlasRequest({text.toString()}, "search_query");
 }
 
 void EmbeddingLLMWorker::docEmbeddingsRequested(const QVector<EmbeddingChunk> &chunks)
@@ -423,7 +425,7 @@ QString EmbeddingLLM::model()
 }
 
 // TODO(jared): embed using all necessary embedding models given collection
-std::vector<float> EmbeddingLLM::generateQueryEmbedding(const QString &text)
+std::vector<float> EmbeddingLLM::generateQueryEmbedding(QStringView text)
 {
     return m_embeddingWorker->generateQueryEmbedding(text);
 }
