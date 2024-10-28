@@ -142,7 +142,6 @@ class Chat;
 class ChatLLM : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(bool restoringFromText READ restoringFromText NOTIFY restoringFromTextChanged)
     Q_PROPERTY(QString deviceBackend READ deviceBackend NOTIFY loadedModelInfoChanged)
     Q_PROPERTY(QString device READ device NOTIFY loadedModelInfoChanged)
     Q_PROPERTY(QString fallbackReason READ fallbackReason NOTIFY loadedModelInfoChanged)
@@ -170,8 +169,6 @@ public:
     ModelInfo modelInfo() const;
     void setModelInfo(const ModelInfo &info);
 
-    bool restoringFromText() const { return m_restoringFromText; }
-
     void acquireModel();
     void resetModel();
 
@@ -196,10 +193,10 @@ public:
         return m_llModelInfo.fallbackReason.value_or(u""_s);
     }
 
-    QString generatedName() const { return QString::fromStdString(m_nameResponse); }
+    QString generatedName() const { return m_nameResponse; }
 
-    bool serialize(QDataStream &stream, int version, bool serializeKV);
-    bool deserialize(QDataStream &stream, int version, bool deserializeKV, bool discardKV);
+    bool serialize(QDataStream &stream, int version);
+    bool deserialize(QDataStream &stream, int version, bool deserializeKV);
 
 public Q_SLOTS:
     bool prompt(const QList<QString> &collectionList, const QString &prompt);
@@ -216,11 +213,8 @@ public Q_SLOTS:
     void handleThreadStarted();
     void handleForceMetalChanged(bool forceMetal);
     void handleDeviceChanged();
-    void processSystemPrompt();
-    void processRestoreStateFromText();
 
 Q_SIGNALS:
-    void restoringFromTextChanged();
     void loadedModelInfoChanged();
     void modelLoadingPercentageChanged(float);
     void modelLoadingError(const QString &error);
@@ -251,14 +245,8 @@ protected:
     bool handleResponse(int32_t token, const std::string &response);
     bool handleNamePrompt(int32_t token);
     bool handleNameResponse(int32_t token, const std::string &response);
-    bool handleSystemPrompt(int32_t token);
-    bool handleSystemResponse(int32_t token, const std::string &response);
-    bool handleRestoreStateFromTextPrompt(int32_t token);
-    bool handleRestoreStateFromTextResponse(int32_t token, const std::string &response);
     bool handleQuestionPrompt(int32_t token);
     bool handleQuestionResponse(int32_t token, const std::string &response);
-    void saveState();
-    void restoreState();
 
 protected:
     LLModel::PromptContext m_ctx;
@@ -269,32 +257,22 @@ private:
     bool loadNewModel(const ModelInfo &modelInfo, QVariantMap &modelLoadProps);
 
     const Chat *m_chat;
-    std::string m_response;
-    std::string m_trimmedResponse;
-    std::string m_nameResponse;
+    QString m_response;
+    QString m_trimmedResponse;
+    QString m_nameResponse;
     QString m_questionResponse;
     LLModelInfo m_llModelInfo;
     LLModelTypeV1 m_llModelType = LLModelTypeV1::NONE;
     ModelInfo m_modelInfo;
     TokenTimer *m_timer;
-    QByteArray m_state;
-    std::vector<LLModel::Token> m_stateInputTokens;
-    int32_t m_stateContextLength = -1;
     QThread m_llmThread;
     std::atomic<bool> m_stopGenerating;
     std::atomic<bool> m_shouldBeLoaded;
-    std::atomic<bool> m_restoringFromText; // status indication
     std::atomic<bool> m_forceUnloadModel;
     std::atomic<bool> m_markedForDeletion;
     bool m_isServer;
     bool m_forceMetal;
     bool m_reloadingToChangeVariant;
-    bool m_processedSystemPrompt;
-    bool m_restoreStateFromText;
-    // m_pristineLoadedState is set if saveSate is unnecessary, either because:
-    // - an unload was queued during LLModel::restoreState()
-    // - the chat will be restored from text and hasn't been interacted with yet
-    bool m_pristineLoadedState = false;
     QPointer<ChatModel> m_chatModel;
 };
 

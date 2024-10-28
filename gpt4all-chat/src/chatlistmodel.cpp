@@ -18,8 +18,8 @@
 
 #include <algorithm>
 
-#define CHAT_FORMAT_MAGIC 0xF5D553CC
-#define CHAT_FORMAT_VERSION 10
+static constexpr quint32 CHAT_FORMAT_MAGIC   = 0xF5D553CC;
+static constexpr qint32  CHAT_FORMAT_VERSION = 11;
 
 class MyChatListModel: public ChatListModel { };
 Q_GLOBAL_STATIC(MyChatListModel, chatListModelInstance)
@@ -118,8 +118,8 @@ void ChatSaver::saveChats(const QVector<Chat *> &chats)
         }
         QDataStream out(&tempFile);
 
-        out << (quint32)CHAT_FORMAT_MAGIC;
-        out << (qint32)CHAT_FORMAT_VERSION;
+        out << CHAT_FORMAT_MAGIC;
+        out << CHAT_FORMAT_VERSION;
         out.setVersion(QDataStream::Qt_6_2);
 
         qDebug() << "serializing chat" << fileName;
