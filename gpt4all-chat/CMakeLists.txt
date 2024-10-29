@@ -387,7 +387,7 @@ target_include_directories(chat PRIVATE deps/usearch/include
 target_link_libraries(chat
     PRIVATE Qt6::Core Qt6::HttpServer Qt6::Pdf Qt6::Quick Qt6::Sql Qt6::Svg)
 target_link_libraries(chat
-    PRIVATE llmodel SingleApplication fmt::fmt duckx::duckx QXlsx)
+    PRIVATE llmodel SingleApplication fmt::fmt duckx::duckx QXlsx jinja2cpp)
 
 if (APPLE)
     target_link_libraries(chat PRIVATE ${COCOA_LIBRARY})

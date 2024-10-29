@@ -12,8 +12,10 @@
 #include <singleapplication.h>
 
 #include <QCoreApplication>
+#include <QFontDatabase>
 #include <QObject>
 #include <QQmlApplicationEngine>
+#include <QQmlContext>
 #include <QQuickWindow>
 #include <QSettings>
 #include <QString>
@@ -109,6 +111,11 @@ int main(int argc, char *argv[])
     qmlRegisterSingletonInstance("network", 1, 0, "Network", Network::globalInstance());
     qmlRegisterSingletonInstance("localdocs", 1, 0, "LocalDocs", LocalDocs::globalInstance());
     qmlRegisterUncreatableMetaObject(MySettingsEnums::staticMetaObject, "mysettingsenums", 1, 0, "MySettingsEnums", "Error: only enums");
+
+    {
+        auto fixedFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+        engine.rootContext()->setContextProperty("fixedFont", fixedFont);
+    }
 
     const QUrl url(u"qrc:/gpt4all/main.qml"_s);
 

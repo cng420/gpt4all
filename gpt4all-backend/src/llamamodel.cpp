@@ -521,9 +521,8 @@ size_t LLamaModel::restoreState(std::span<const uint8_t> state, std::span<const 
 std::vector<LLModel::Token> LLamaModel::tokenize(std::string_view str)
 {
     std::vector<LLModel::Token> fres(str.length() + 4);
-    int32_t fres_len = llama_tokenize_gpt4all(
-        d_ptr->model, str.data(), str.length(), fres.data(), fres.size(), /*add_special*/ false,
-        /*parse_special*/ true, /*insert_space*/ true // TODO: remove insert_space from llama.cpp
+    int32_t fres_len = llama_tokenize(
+        d_ptr->model, str.data(), str.length(), fres.data(), fres.size(), /*add_special*/ false, /*parse_special*/ true
     );
     fres.resize(fres_len);
     return fres;

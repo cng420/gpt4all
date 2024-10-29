@@ -7,6 +7,18 @@
 #include "mysettings.h"
 #include "network.h"
 
+#include <fmt/format.h>
+
+// FIXME(jared): Jinja2Cpp headers should compile with -Werror=undef
+#ifdef __GNUC__
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wundef"
+#endif
+#include <jinja2cpp/template_env.h>
+#ifdef __GNUC__
+#   pragma GCC diagnostic pop
+#endif
+
 #include <QDataStream>
 #include <QDebug>
 #include <QFile>
@@ -36,14 +48,29 @@
 #include <regex>
 #include <span>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 using namespace Qt::Literals::StringLiterals;
 namespace ranges = std::ranges;
+namespace views = std::views;
 
 //#define DEBUG
 //#define DEBUG_MODEL_LOADING
+
+// NOTE: not threadsafe
+static jinja2::TemplateEnv *jinjaEnv()
+{
+    static std::optional<jinja2::TemplateEnv> env;
+    if (!env) {
+        auto &e = env.emplace();
+        auto &settings = e.GetSettings();
+        settings.trimBlocks = true;
+        settings.lstripBlocks = true;
+    }
+    return &*env;
+}
 
 class LLModelStore {
 public:
@@ -674,6 +701,44 @@ void ChatLLM::prompt(QStringView prompt, const QStringList &enabledCollections)
     }
 }
 
+class Message : public jinja2::IMapItemAccessor {
+public:
+    Message(std::string role, std::string content) noexcept
+        : role(std::move(role)), content(std::move(content)) {}
+
+    size_t GetSize() const override { return _items.size(); }
+    bool HasValue(const std::string &name) const override { return _items.contains(name); }
+
+    jinja2::Value GetValueByName(const std::string &name) const override
+    {
+        if (auto it = _items.find(name); it != _items.end()) {
+            auto [_, ptr] = *it;
+            return this->*ptr;
+        }
+        return jinja2::EmptyValue();
+    }
+
+    std::vector<std::string> GetKeys() const override
+    { auto keys = views::elements<0>(_items); return { keys.begin(), keys.end() }; }
+
+    bool IsEqual(const jinja2::IComparable &other) const override
+    { const Message *omsg; return (omsg = dynamic_cast<const Message *>(&other)) && *this == *omsg; }
+
+    friend bool operator==(const Message &a, const Message &b)
+    { return std::tie(a.role, a.content) == std::tie(b.role, b.content); }
+
+    static const std::unordered_map<std::string_view, std::string Message::*> _items;
+
+protected:
+    std::string role;
+    std::string content;
+};
+
+inline const std::unordered_map<std::string_view, std::string Message::*> Message::_items = {
+    { "role",    &Message::role    },
+    { "content", &Message::content },
+};
+
 auto ChatLLM::promptInternal(
     QStringView prompt, const QStringList &enabledCollections, const LLModel::PromptContext &ctx
 ) -> std::optional<PromptResult> {
@@ -710,6 +775,34 @@ auto ChatLLM::promptInternal(
     }
 #endif
 
+    auto makeMap = [] <typename... T> (T &&...args) {
+        auto accessor = [msg = Message(std::forward<T>(args)...)]() {
+            return &msg;
+        };
+        return jinja2::GenericMap(std::move(accessor));
+    };
+
+    jinja2::ValuesList messages {
+        makeMap("user",      "foo"),
+        makeMap("assistant", "bar"),
+        makeMap("user",      prompt.toUtf8().toStdString()),
+    };
+
+    jinja2::ValuesMap params {
+        { "messages",              std::move(messages) },
+        { "bos_token",             "<|begin_of_text|>" },
+        { "eos_token",             "<|eot_id|>"        },
+        { "add_generation_prompt", true                },
+    };
+
+    auto promptTemplate = mySettings->modelPromptTemplate(m_modelInfo);
+    jinja2::Template tmpl(jinjaEnv());
+    auto renderedPrompt = tmpl.Load(promptTemplate.toUtf8()).and_then([&tmpl, &params] {
+        return tmpl.RenderAsString(params);
+    });
+    if (!renderedPrompt)
+        throw std::runtime_error(fmt::format("Failed to parse prompt template: {}", renderedPrompt.error().ToString()));
+
     PromptResult result;
 
     auto handlePrompt = [this, &result](std::span<const LLModel::Token> batch, bool cached) -> bool {
@@ -735,9 +828,7 @@ auto ChatLLM::promptInternal(
     emit promptProcessing();
     m_llModelInfo.model->setThreadCount(mySettings->threadCount());
     m_stopGenerating = false;
-    // TODO(jared): apply prompt template using Jinja before this line
-    auto promptUtf8 = prompt.toUtf8();
-    m_llModelInfo.model->prompt({ promptUtf8.data(), size_t(promptUtf8.size()) }, handlePrompt, handleResponse, ctx);
+    m_llModelInfo.model->prompt(*renderedPrompt, handlePrompt, handleResponse, ctx);
 
     m_timer->stop();
     qint64 elapsed = totalTime.elapsed();

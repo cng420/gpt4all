@@ -289,7 +289,8 @@ void ChatListModel::restoreChat(Chat *chat)
 
 void ChatListModel::chatsRestoredFinished()
 {
-    addServerChat();
+    // TODO(jared): add this back with Jinja support
+    // addServerChat();
 }
 
 void ChatListModel::handleServerEnabledChanged()
