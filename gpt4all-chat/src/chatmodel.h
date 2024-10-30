@@ -18,6 +18,12 @@
 #include <Qt>
 #include <QtGlobal>
 
+#include <ranges>
+
+using namespace Qt::Literals::StringLiterals;
+namespace ranges = std::ranges;
+
+
 struct PromptAttachment {
     Q_GADGET
     Q_PROPERTY(QUrl url MEMBER url)
@@ -60,30 +66,31 @@ Q_DECLARE_METATYPE(PromptAttachment)
 struct ChatItem
 {
     Q_GADGET
-    Q_PROPERTY(int id MEMBER id)
-    Q_PROPERTY(QString name MEMBER name)
-    Q_PROPERTY(QString value MEMBER value)
-    Q_PROPERTY(QString newResponse MEMBER newResponse)
-    Q_PROPERTY(bool currentResponse MEMBER currentResponse)
-    Q_PROPERTY(bool stopped MEMBER stopped)
-    Q_PROPERTY(bool thumbsUpState MEMBER thumbsUpState)
-    Q_PROPERTY(bool thumbsDownState MEMBER thumbsDownState)
-    Q_PROPERTY(QList<ResultInfo> sources MEMBER sources)
-    Q_PROPERTY(QList<ResultInfo> consolidatedSources MEMBER consolidatedSources)
-    Q_PROPERTY(QList<PromptAttachment> promptAttachments MEMBER promptAttachments)
-    Q_PROPERTY(QString promptPlusAttachments READ promptPlusAttachments)
+    Q_PROPERTY(int                     id                    MEMBER id)
+    Q_PROPERTY(QString                 name                  MEMBER name)
+    Q_PROPERTY(QString                 value                 MEMBER value)
+    Q_PROPERTY(bool                    currentResponse       MEMBER currentResponse)
+    Q_PROPERTY(QList<ResultInfo>       sources               MEMBER sources)
+    Q_PROPERTY(QList<ResultInfo>       consolidatedSources   MEMBER consolidatedSources)
+    Q_PROPERTY(QList<PromptAttachment> promptAttachments     MEMBER promptAttachments)
+    Q_PROPERTY(QString                 promptPlusAttachments READ   promptPlusAttachments)
+    // DataLake properties
+    Q_PROPERTY(QString newResponse     MEMBER newResponse)
+    Q_PROPERTY(bool    stopped         MEMBER stopped)
+    Q_PROPERTY(bool    thumbsUpState   MEMBER thumbsUpState)
+    Q_PROPERTY(bool    thumbsDownState MEMBER thumbsDownState)
 
 public:
     QString promptPlusAttachments() const
     {
-        QStringList attachedContexts;
-        for (auto attached : promptAttachments)
-            attachedContexts << attached.processedContent();
-
-        QString promptPlus = value;
-        if (!attachedContexts.isEmpty())
-            promptPlus = attachedContexts.join("\n\n") + "\n\n" + value;
-        return promptPlus;
+        if (!promptAttachments.isEmpty()) {
+            QStringList items;
+            for (auto &attached : std::as_const(promptAttachments))
+                items << attached.processedContent();
+            items << value;
+            return items.join("\n\n"_L1);
+        }
+        return value;
     }
 
     // TODO: Maybe we should include the model name here as well as timestamp?
@@ -101,7 +108,18 @@ public:
 };
 Q_DECLARE_METATYPE(ChatItem)
 
-using ChatModelIterator = QList<ChatItem>::const_iterator;
+class ChatModelAccessor : public std::span<const ChatItem> {
+private:
+    using Super = std::span<const ChatItem>;
+
+public:
+    template <typename... T>
+    ChatModelAccessor(QMutex &mutex, T &&...args)
+        : Super(std::forward<T>(args)...), m_lock(&mutex) {}
+
+private:
+    QMutexLocker<QMutex> m_lock;
+};
 
 class ChatModel : public QAbstractListModel
 {
@@ -109,10 +127,11 @@ class ChatModel : public QAbstractListModel
     Q_PROPERTY(int count READ count NOTIFY countChanged)
 
 public:
-    explicit ChatModel(QObject *parent = nullptr) : QAbstractListModel(parent) {}
+    explicit ChatModel(QObject *parent = nullptr)
+        : QAbstractListModel(parent) {}
 
     enum Roles {
-        IdRole = Qt::UserRole + 1,
+        IdRole = Qt::UserRole,
         NameRole,
         ValueRole,
         NewResponseRole,
@@ -373,10 +392,7 @@ public:
 
     int count() const { QMutexLocker locker(&m_mutex); return m_chatItems.size(); }
 
-    ChatModelIterator begin() const { return m_chatItems.begin(); }
-    ChatModelIterator end() const { return m_chatItems.end(); }
-    void lock() { m_mutex.lock(); }
-    void unlock() { m_mutex.unlock(); }
+    ChatModelAccessor chatItems() const { return {m_mutex, std::as_const(m_chatItems)}; }
 
     bool serialize(QDataStream &stream, int version) const
     {

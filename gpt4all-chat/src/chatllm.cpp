@@ -3,6 +3,7 @@
 #include "chat.h"
 #include "chatapi.h"
 #include "chatmodel.h"
+#include "jinja_helpers.h"
 #include "localdocs.h"
 #include "mysettings.h"
 #include "network.h"
@@ -701,49 +702,13 @@ void ChatLLM::prompt(QStringView prompt, const QStringList &enabledCollections)
     }
 }
 
-class Message : public jinja2::IMapItemAccessor {
-public:
-    Message(std::string role, std::string content) noexcept
-        : role(std::move(role)), content(std::move(content)) {}
-
-    size_t GetSize() const override { return _items.size(); }
-    bool HasValue(const std::string &name) const override { return _items.contains(name); }
-
-    jinja2::Value GetValueByName(const std::string &name) const override
-    {
-        if (auto it = _items.find(name); it != _items.end()) {
-            auto [_, ptr] = *it;
-            return this->*ptr;
-        }
-        return jinja2::EmptyValue();
-    }
-
-    std::vector<std::string> GetKeys() const override
-    { auto keys = views::elements<0>(_items); return { keys.begin(), keys.end() }; }
-
-    bool IsEqual(const jinja2::IComparable &other) const override
-    { const Message *omsg; return (omsg = dynamic_cast<const Message *>(&other)) && *this == *omsg; }
-
-    friend bool operator==(const Message &a, const Message &b)
-    { return std::tie(a.role, a.content) == std::tie(b.role, b.content); }
-
-    static const std::unordered_map<std::string_view, std::string Message::*> _items;
-
-protected:
-    std::string role;
-    std::string content;
-};
-
-inline const std::unordered_map<std::string_view, std::string Message::*> Message::_items = {
-    { "role",    &Message::role    },
-    { "content", &Message::content },
-};
-
 auto ChatLLM::promptInternal(
     QStringView prompt, const QStringList &enabledCollections, const LLModel::PromptContext &ctx
 ) -> std::optional<PromptResult> {
     if (!isModelLoaded())
         return std::nullopt;
+
+    Q_ASSERT(m_chatModel);
 
     auto *mySettings = MySettings::globalInstance();
 
@@ -775,33 +740,37 @@ auto ChatLLM::promptInternal(
     }
 #endif
 
-    auto makeMap = [] <typename... T> (T &&...args) {
-        auto accessor = [msg = Message(std::forward<T>(args)...)]() {
-            return &msg;
+    auto makeMap = [](const ChatItem &item) {
+        return jinja2::GenericMap([msg = JinjaMessage(item)] { return &msg; });
+    };
+
+    std::string renderedPrompt;
+    {
+        auto items = m_chatModel->chatItems(); // holds lock
+
+        jinja2::ValuesList messages;
+        messages.reserve(items.size() + 1);
+        for (auto &item : items)
+            messages.emplace_back(makeMap(item));
+        // TODO(jared): insert this earlier in *this* function... newPromptResponsePair is weird
+        // messages.emplace_back(makeMap("user", prompt.toUtf8()));
+
+        jinja2::ValuesMap params {
+            { "messages",              std::move(messages) },
+            { "bos_token",             "<|begin_of_text|>" },
+            { "eos_token",             "<|eot_id|>"        },
+            { "add_generation_prompt", true                },
         };
-        return jinja2::GenericMap(std::move(accessor));
-    };
 
-    jinja2::ValuesList messages {
-        makeMap("user",      "foo"),
-        makeMap("assistant", "bar"),
-        makeMap("user",      prompt.toUtf8().toStdString()),
-    };
-
-    jinja2::ValuesMap params {
-        { "messages",              std::move(messages) },
-        { "bos_token",             "<|begin_of_text|>" },
-        { "eos_token",             "<|eot_id|>"        },
-        { "add_generation_prompt", true                },
-    };
-
-    auto promptTemplate = mySettings->modelPromptTemplate(m_modelInfo);
-    jinja2::Template tmpl(jinjaEnv());
-    auto renderedPrompt = tmpl.Load(promptTemplate.toUtf8()).and_then([&tmpl, &params] {
-        return tmpl.RenderAsString(params);
-    });
-    if (!renderedPrompt)
-        throw std::runtime_error(fmt::format("Failed to parse prompt template: {}", renderedPrompt.error().ToString()));
+        auto promptTemplate = mySettings->modelPromptTemplate(m_modelInfo);
+        jinja2::Template tmpl(jinjaEnv());
+        auto maybeRendered = tmpl.Load(promptTemplate.toUtf8()).and_then([&tmpl, &params] {
+            return tmpl.RenderAsString(params);
+        });
+        if (!maybeRendered)
+            throw std::runtime_error(fmt::format("Failed to parse prompt template: {}", maybeRendered.error().ToString()));
+        renderedPrompt = std::move(*maybeRendered);
+    }
 
     PromptResult result;
 
@@ -828,7 +797,7 @@ auto ChatLLM::promptInternal(
     emit promptProcessing();
     m_llModelInfo.model->setThreadCount(mySettings->threadCount());
     m_stopGenerating = false;
-    m_llModelInfo.model->prompt(*renderedPrompt, handlePrompt, handleResponse, ctx);
+    m_llModelInfo.model->prompt(renderedPrompt, handlePrompt, handleResponse, ctx);
 
     m_timer->stop();
     qint64 elapsed = totalTime.elapsed();
@@ -1101,65 +1070,3 @@ bool ChatLLM::deserialize(QDataStream &stream, int version)
     }
     return stream.status() == QDataStream::Ok;
 }
-
-// TODO(jared): remove when no longer needed for reference
-// this is how all new messages will be prompted, more or less
-#if 0
-void ChatLLM::processRestoreStateFromText()
-{
-    Q_ASSERT(isModelLoaded());
-    if (!isModelLoaded() || !m_restoreStateFromText || m_isServer)
-        return;
-
-    m_stopGenerating = false;
-
-    auto promptFunc = std::bind(&ChatLLM::handleRestoreStateFromTextPrompt, this, std::placeholders::_1);
-
-    const QString promptTemplate = MySettings::globalInstance()->modelPromptTemplate(m_modelInfo);
-    const int32_t n_predict = MySettings::globalInstance()->modelMaxLength(m_modelInfo);
-    const int32_t top_k = MySettings::globalInstance()->modelTopK(m_modelInfo);
-    const float top_p = MySettings::globalInstance()->modelTopP(m_modelInfo);
-    const float min_p = MySettings::globalInstance()->modelMinP(m_modelInfo);
-    const float temp = MySettings::globalInstance()->modelTemperature(m_modelInfo);
-    const int32_t n_batch = MySettings::globalInstance()->modelPromptBatchSize(m_modelInfo);
-    const float repeat_penalty = MySettings::globalInstance()->modelRepeatPenalty(m_modelInfo);
-    const int32_t repeat_penalty_tokens = MySettings::globalInstance()->modelRepeatPenaltyTokens(m_modelInfo);
-    int n_threads = MySettings::globalInstance()->threadCount();
-    m_ctx.n_predict = n_predict;
-    m_ctx.top_k = top_k;
-    m_ctx.top_p = top_p;
-    m_ctx.min_p = min_p;
-    m_ctx.temp = temp;
-    m_ctx.n_batch = n_batch;
-    m_ctx.repeat_penalty = repeat_penalty;
-    m_ctx.repeat_last_n = repeat_penalty_tokens;
-    m_llModelInfo.model->setThreadCount(n_threads);
-
-    Q_ASSERT(m_chatModel);
-    m_chatModel->lock();
-    auto it = m_chatModel->begin();
-    while (it < m_chatModel->end()) {
-        auto &prompt = *it++;
-        Q_ASSERT(prompt.name == "Prompt: ");
-        Q_ASSERT(it < m_chatModel->end());
-
-        auto &response = *it++;
-        Q_ASSERT(response.name == "Response: ");
-
-        // FIXME(jared): this doesn't work well with the "regenerate" button since we are not incrementing
-        //               m_promptTokens or m_promptResponseTokens
-        m_llModelInfo.model->prompt(
-            prompt.promptPlusAttachments().toStdString(), promptTemplate.toStdString(),
-            promptFunc, /*responseFunc*/ [](auto &&...) { return true; },
-            /*allowContextShift*/ true,
-            m_ctx,
-            /*special*/ false,
-            response.value.toUtf8().constData()
-        );
-    }
-    m_chatModel->unlock();
-
-    if (!m_stopGenerating)
-        m_restoreStateFromText = false;
-}
-#endif

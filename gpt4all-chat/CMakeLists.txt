@@ -190,6 +190,7 @@ qt_add_executable(chat
     src/database.cpp              src/database.h
     src/download.cpp              src/download.h
     src/embllm.cpp                src/embllm.h
+    src/jinja_helpers.cpp         src/jinja_helpers.h
     src/llm.cpp                   src/llm.h
     src/localdocs.cpp             src/localdocs.h
     src/localdocsmodel.cpp        src/localdocsmodel.h
