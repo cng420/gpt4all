@@ -4,12 +4,10 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <iostream>
 #include <iterator>
 #include <optional>
 #include <ranges>
-#include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <string>

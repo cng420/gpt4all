@@ -12,6 +12,7 @@
 #include <singleapplication.h>
 
 #include <QCoreApplication>
+#include <QFont>
 #include <QFontDatabase>
 #include <QObject>
 #include <QQmlApplicationEngine>
@@ -20,6 +21,7 @@
 #include <QSettings>
 #include <QString>
 #include <QUrl>
+#include <QVariant>
 #include <Qt>
 
 #ifdef Q_OS_LINUX

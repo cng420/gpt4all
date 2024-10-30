@@ -15,7 +15,10 @@
 #   pragma GCC diagnostic push
 #   pragma GCC diagnostic ignored "-Wundef"
 #endif
+#include <jinja2cpp/error_info.h>
+#include <jinja2cpp/template.h>
 #include <jinja2cpp/template_env.h>
+#include <jinja2cpp/value.h>
 #ifdef __GNUC__
 #   pragma GCC diagnostic pop
 #endif
@@ -30,24 +33,23 @@
 #include <QJsonValue>
 #include <QMap>
 #include <QMutex>
-#include <QMutexLocker>
+#include <QMutexLocker> // IWYU pragma: keep
 #include <QSet>
-#include <QStringList>
 #include <QUrl>
 #include <QWaitCondition>
 #include <Qt>
 #include <QtLogging>
 
 #include <algorithm>
-#include <cctype>
 #include <cmath>
 #include <cstddef>
-#include <functional>
+#include <exception>
 #include <limits>
 #include <optional>
 #include <ranges>
 #include <regex>
 #include <span>
+#include <stdexcept>
 #include <string_view>
 #include <tuple>
 #include <utility>

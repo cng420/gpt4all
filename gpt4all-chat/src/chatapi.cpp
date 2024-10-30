@@ -1,10 +1,8 @@
 #include "chatapi.h"
 
-#include <gpt4all-backend/llmodel.h>
-
 #include <QCoreApplication>
-#include <QGuiApplication>
 #include <QDebug>
+#include <QGuiApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -13,12 +11,15 @@
 #include <QNetworkRequest>
 #include <QThread>
 #include <QUrl>
+#include <QUtf8StringView>
 #include <QVariant>
 #include <Qt>
 #include <QtGlobal>
 #include <QtLogging>
 
+#include <functional>
 #include <iostream>
+#include <utility>
 
 using namespace Qt::Literals::StringLiterals;
 

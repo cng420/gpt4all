@@ -1,7 +1,6 @@
 #include "chat.h"
 
 #include "chatlistmodel.h"
-#include "mysettings.h"
 #include "network.h"
 #include "server.h"
 
@@ -11,7 +10,6 @@
 #include <QLatin1String>
 #include <QMap>
 #include <QString>
-#include <QStringList>
 #include <QVariant>
 #include <Qt>
 #include <QtLogging>

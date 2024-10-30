@@ -7,13 +7,9 @@
 #include <QNetworkReply>
 #include <QObject>
 #include <QString>
-#include <QStringList>
-#include <QList>
 
 #include <cstddef>
 #include <cstdint>
-#include <functional>
-#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>

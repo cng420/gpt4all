@@ -12,6 +12,8 @@
 #include <QObject>
 #include <QQmlEngine>
 #include <QString>
+#include <QStringList> // IWYU pragma: keep
+#include <QStringView>
 #include <QtGlobal>
 
 class QDataStream;

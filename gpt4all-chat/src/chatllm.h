@@ -13,8 +13,10 @@
 #include <QObject>
 #include <QPointer>
 #include <QString>
+#include <QStringList> // IWYU pragma: keep
+#include <QStringView>
 #include <QThread>
-#include <QVariantMap>
+#include <QVariantMap> // IWYU pragma: keep
 #include <QtGlobal>
 
 #include <atomic>
@@ -22,7 +24,6 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <vector>
 
 using namespace Qt::Literals::StringLiterals;
 
