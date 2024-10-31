@@ -66,19 +66,19 @@ Q_DECLARE_METATYPE(PromptAttachment)
 struct ChatItem
 {
     Q_GADGET
-    Q_PROPERTY(int                     id                    MEMBER id)
-    Q_PROPERTY(QString                 name                  MEMBER name)
-    Q_PROPERTY(QString                 value                 MEMBER value)
-    Q_PROPERTY(bool                    currentResponse       MEMBER currentResponse)
-    Q_PROPERTY(QList<ResultInfo>       sources               MEMBER sources)
-    Q_PROPERTY(QList<ResultInfo>       consolidatedSources   MEMBER consolidatedSources)
-    Q_PROPERTY(QList<PromptAttachment> promptAttachments     MEMBER promptAttachments)
-    Q_PROPERTY(QString                 promptPlusAttachments READ   promptPlusAttachments)
+    Q_PROPERTY(int id MEMBER id)
+    Q_PROPERTY(QString name MEMBER name)
+    Q_PROPERTY(QString value MEMBER value)
+    Q_PROPERTY(bool currentResponse MEMBER currentResponse)
+    Q_PROPERTY(QList<ResultInfo> sources MEMBER sources)
+    Q_PROPERTY(QList<ResultInfo> consolidatedSources MEMBER consolidatedSources)
+    Q_PROPERTY(QList<PromptAttachment> promptAttachments MEMBER promptAttachments)
+    Q_PROPERTY(QString promptPlusAttachments READ promptPlusAttachments)
     // DataLake properties
-    Q_PROPERTY(QString newResponse     MEMBER newResponse)
-    Q_PROPERTY(bool    stopped         MEMBER stopped)
-    Q_PROPERTY(bool    thumbsUpState   MEMBER thumbsUpState)
-    Q_PROPERTY(bool    thumbsDownState MEMBER thumbsDownState)
+    Q_PROPERTY(QString newResponse MEMBER newResponse)
+    Q_PROPERTY(bool stopped MEMBER stopped)
+    Q_PROPERTY(bool thumbsUpState MEMBER thumbsUpState)
+    Q_PROPERTY(bool thumbsDownState MEMBER thumbsDownState)
 
 public:
     QString promptPlusAttachments() const
@@ -130,8 +130,9 @@ public:
     explicit ChatModel(QObject *parent = nullptr)
         : QAbstractListModel(parent) {}
 
+    // FIXME(jared): can't this start at Qt::UserRole (no +1)?
     enum Roles {
-        IdRole = Qt::UserRole,
+        IdRole = Qt::UserRole + 1,
         NameRole,
         ValueRole,
         NewResponseRole,

@@ -6,7 +6,6 @@
 #include <QObject>
 #include <QString>
 #include <QStringList>
-#include <QStringView>
 #include <QThread>
 #include <QVariant>
 #include <QVector>
@@ -47,14 +46,14 @@ public:
     bool isNomic() const { return !m_nomicAPIKey.isEmpty(); }
     bool hasModel() const { return isNomic() || m_model; }
 
-    std::vector<float> generateQueryEmbedding(QStringView text);
+    std::vector<float> generateQueryEmbedding(const QString &text);
 
 public Q_SLOTS:
-    void atlasQueryEmbeddingRequested(QStringView text);
+    void atlasQueryEmbeddingRequested(const QString &text);
     void docEmbeddingsRequested(const QVector<EmbeddingChunk> &chunks);
 
 Q_SIGNALS:
-    void requestAtlasQueryEmbedding(QStringView text);
+    void requestAtlasQueryEmbedding(const QString &text);
     void embeddingsGenerated(const QVector<EmbeddingResult> &embeddings);
     void errorGenerated(const QVector<EmbeddingChunk> &chunks, const QString &error);
     void finished();
@@ -86,7 +85,7 @@ public:
     bool hasModel() const;
 
 public Q_SLOTS:
-    std::vector<float> generateQueryEmbedding(QStringView text); // synchronous
+    std::vector<float> generateQueryEmbedding(const QString &text); // synchronous
     void generateDocEmbeddingsAsync(const QVector<EmbeddingChunk> &chunks);
 
 Q_SIGNALS:

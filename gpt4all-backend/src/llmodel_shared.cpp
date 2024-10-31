@@ -262,7 +262,7 @@ void LLModel::generateResponse(
 }
 
 void LLModel::embed(
-    std::span<const std::string> texts, float *embeddings, std::optional<std::string> prefix, int dimensionality,
+    const std::vector<std::string> &texts, float *embeddings, std::optional<std::string> prefix, int dimensionality,
     size_t *tokenCount, bool doMean, bool atlas, EmbedCancelCallback *cancelCb
 ) {
     (void)texts;
@@ -277,7 +277,7 @@ void LLModel::embed(
 }
 
 void LLModel::embed(
-    std::span<const std::string> texts, float *embeddings, bool isRetrieval, int dimensionality, size_t *tokenCount,
+    const std::vector<std::string> &texts, float *embeddings, bool isRetrieval, int dimensionality, size_t *tokenCount,
     bool doMean, bool atlas
 ) {
     (void)texts;

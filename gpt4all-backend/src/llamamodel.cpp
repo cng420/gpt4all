@@ -958,7 +958,7 @@ static const EmbModelSpec *getEmbedSpec(const std::string &modelName) {
 }
 
 void LLamaModel::embed(
-    std::span<const std::string> texts, float *embeddings, bool isRetrieval, int dimensionality, size_t *tokenCount,
+    const std::vector<std::string> &texts, float *embeddings, bool isRetrieval, int dimensionality, size_t *tokenCount,
     bool doMean, bool atlas
 ) {
     const EmbModelSpec *spec;
@@ -970,7 +970,7 @@ void LLamaModel::embed(
 }
 
 void LLamaModel::embed(
-    std::span<const std::string> texts, float *embeddings, std::optional<std::string> prefix, int dimensionality,
+    const std::vector<std::string> &texts, float *embeddings, std::optional<std::string> prefix, int dimensionality,
     size_t *tokenCount, bool doMean, bool atlas, LLModel::EmbedCancelCallback *cancelCb
 ) {
     if (!d_ptr->model)
@@ -1028,8 +1028,8 @@ double getL2NormScale(T *start, T *end)
 }
 
 void LLamaModel::embedInternal(
-    std::span<const std::string> texts, float *embeddings, std::string prefix, int dimensionality, size_t *tokenCount,
-    bool doMean, bool atlas, LLModel::EmbedCancelCallback *cancelCb, const EmbModelSpec *spec
+    const std::vector<std::string> &texts, float *embeddings, std::string prefix, int dimensionality,
+    size_t *tokenCount, bool doMean, bool atlas, LLModel::EmbedCancelCallback *cancelCb, const EmbModelSpec *spec
 ) {
     typedef std::vector<LLModel::Token> TokenString;
     static constexpr int32_t atlasMaxLength = 8192;
@@ -1049,7 +1049,7 @@ void LLamaModel::embedInternal(
 
         tokens.resize(text.length()+4);
         int32_t n_tokens = llama_tokenize_gpt4all(
-            d_ptr->model, text.data(), text.size(), tokens.data(), tokens.size(), /*add_special*/ wantBOS,
+            d_ptr->model, text.c_str(), text.length(), tokens.data(), tokens.size(), /*add_special*/ wantBOS,
             /*parse_special*/ false, /*insert_space*/ false
         );
         if (n_tokens) {
