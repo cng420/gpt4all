@@ -691,25 +691,60 @@ static LLModel::PromptContext promptContextFromSettings(const ModelInfo &modelIn
     };
 }
 
-void ChatLLM::prompt(QStringView prompt, const QStringList &enabledCollections)
+void ChatLLM::prompt(const QStringList &enabledCollections)
 {
     if (!isModelLoaded())
         return;
 
     try {
-        promptInternal(prompt, enabledCollections, promptContextFromSettings(m_modelInfo));
+        promptInternal(enabledCollections, promptContextFromSettings(m_modelInfo));
     } catch (const std::exception &e) {
         // FIXME(jared): this is neither translated nor serialized
         emit responseChanged(e.what());
     }
 }
 
-auto ChatLLM::promptInternal(
-    QStringView prompt, const QStringList &enabledCollections, const LLModel::PromptContext &ctx
-) -> std::optional<PromptResult> {
-    if (!isModelLoaded())
-        return std::nullopt;
+std::string ChatLLM::applyJinjaTemplate(bool query) const
+{
+    Q_ASSERT(m_chatModel);
 
+    auto makeMap = [](const ChatItem &item) {
+        return jinja2::GenericMap([msg = JinjaMessage(item)] { return &msg; });
+    };
+
+    auto items = m_chatModel->chatItems(); // holds lock
+    Q_ASSERT(items.size() >= 2); // should be prompt/response pairs
+
+    jinja2::ValuesList messages;
+    // query mode uses only the previous message
+    std::span promptItems(items.begin(), query ? items.begin() + 1 : items.end() - 1);
+    messages.reserve(promptItems.size());
+    for (auto &item : promptItems)
+        messages.emplace_back(makeMap(item));
+
+    jinja2::ValuesMap params {
+        { "messages",              std::move(messages) },
+        { "bos_token",             "<|begin_of_text|>" },
+        { "eos_token",             "<|eot_id|>"        },
+        { "add_generation_prompt", true                },
+        // if true, this should only return text to be embedded, without special tokens
+        { "query_mode",            query               },
+    };
+
+    auto promptTemplate = MySettings::globalInstance()->modelPromptTemplate(m_modelInfo);
+
+    jinja2::Template tmpl(jinjaEnv());
+    auto maybeRendered = tmpl.Load(promptTemplate.toUtf8()).and_then([&tmpl, &params] {
+        return tmpl.RenderAsString(params);
+    });
+    if (!maybeRendered)
+        throw std::runtime_error(fmt::format("Failed to parse prompt template: {}", maybeRendered.error().ToString()));
+    return *maybeRendered;
+}
+
+auto ChatLLM::promptInternal(const QStringList &enabledCollections, const LLModel::PromptContext &ctx) -> PromptResult
+{
+    Q_ASSERT(isModelLoaded());
     Q_ASSERT(m_chatModel);
 
     auto *mySettings = MySettings::globalInstance();
@@ -717,7 +752,8 @@ auto ChatLLM::promptInternal(
     QList<ResultInfo> databaseResults;
     const int retrievalSize = mySettings->localDocsRetrievalSize();
     if (!enabledCollections.isEmpty()) {
-        emit requestRetrieveFromDB(enabledCollections, prompt.toString(), retrievalSize, &databaseResults); // blocks
+        auto query = QString::fromStdString(applyJinjaTemplate(/*query*/ true));
+        emit requestRetrieveFromDB(enabledCollections, query, retrievalSize, &databaseResults); // blocks
         emit databaseResultsChanged(databaseResults);
     }
 
@@ -742,38 +778,6 @@ auto ChatLLM::promptInternal(
     }
 #endif
 
-    auto makeMap = [](const ChatItem &item) {
-        return jinja2::GenericMap([msg = JinjaMessage(item)] { return &msg; });
-    };
-
-    std::string renderedPrompt;
-    {
-        auto items = m_chatModel->chatItems(); // holds lock
-
-        jinja2::ValuesList messages;
-        messages.reserve(items.size() + 1);
-        for (auto &item : items)
-            messages.emplace_back(makeMap(item));
-        // TODO(jared): insert this earlier in *this* function... newPromptResponsePair is weird
-        // messages.emplace_back(makeMap("user", prompt.toUtf8()));
-
-        jinja2::ValuesMap params {
-            { "messages",              std::move(messages) },
-            { "bos_token",             "<|begin_of_text|>" },
-            { "eos_token",             "<|eot_id|>"        },
-            { "add_generation_prompt", true                },
-        };
-
-        auto promptTemplate = mySettings->modelPromptTemplate(m_modelInfo);
-        jinja2::Template tmpl(jinjaEnv());
-        auto maybeRendered = tmpl.Load(promptTemplate.toUtf8()).and_then([&tmpl, &params] {
-            return tmpl.RenderAsString(params);
-        });
-        if (!maybeRendered)
-            throw std::runtime_error(fmt::format("Failed to parse prompt template: {}", maybeRendered.error().ToString()));
-        renderedPrompt = std::move(*maybeRendered);
-    }
-
     PromptResult result;
 
     auto handlePrompt = [this, &result](std::span<const LLModel::Token> batch, bool cached) -> bool {
@@ -792,6 +796,8 @@ auto ChatLLM::promptInternal(
         return !m_stopGenerating;
     };
 
+    auto conversation = applyJinjaTemplate();
+
     QElapsedTimer totalTime;
     totalTime.start();
     m_timer->start();
@@ -799,7 +805,7 @@ auto ChatLLM::promptInternal(
     emit promptProcessing();
     m_llModelInfo.model->setThreadCount(mySettings->threadCount());
     m_stopGenerating = false;
-    m_llModelInfo.model->prompt(renderedPrompt, handlePrompt, handleResponse, ctx);
+    m_llModelInfo.model->prompt(conversation, handlePrompt, handleResponse, ctx);
 
     m_timer->stop();
     qint64 elapsed = totalTime.elapsed();

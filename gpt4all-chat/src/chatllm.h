@@ -194,7 +194,7 @@ public:
     bool deserialize(QDataStream &stream, int version);
 
 public Q_SLOTS:
-    void prompt(QStringView prompt, const QStringList &enabledCollections);
+    void prompt(const QStringList &enabledCollections);
     bool loadDefaultModel();
     void trySwitchContextOfLoadedModel(const ModelInfo &modelInfo);
     bool loadModel(const ModelInfo &modelInfo);
@@ -234,24 +234,17 @@ Q_SIGNALS:
 
 protected:
     struct PromptResult {
-        QByteArray response; // raw UTF-8
-        quint32    promptTokens; // note: counts *entire* history, even if cached
+        QByteArray response;       // raw UTF-8
+        quint32    promptTokens;   // note: counts *entire* history, even if cached
         quint32    responseTokens;
     };
 
-    auto promptInternal(QStringView prompt, const QStringList &enabledCollections, const LLModel::PromptContext &ctx)
-        -> std::optional<PromptResult>;
-    bool promptInternal(const QList<QString> &collectionList, const QString &prompt, const QString &promptTemplate,
-        int32_t n_predict, int32_t top_k, float top_p, float min_p, float temp, int32_t n_batch, float repeat_penalty,
-        int32_t repeat_penalty_tokens, std::optional<QString> fakeReply = {});
-    bool handlePrompt(int32_t token);
-    bool handleResponse(int32_t token, const std::string &response);
-    bool handleNamePrompt(int32_t token);
-    bool handleNameResponse(int32_t token, const std::string &response);
-    bool handleQuestionPrompt(int32_t token);
-    bool handleQuestionResponse(int32_t token, const std::string &response);
+    PromptResult promptInternal(const QStringList &enabledCollections, const LLModel::PromptContext &ctx);
 
 private:
+    // Applies the Jinja template. Query mode returns only the last message without special tokens.
+    std::string applyJinjaTemplate(bool query = false) const;
+
     bool loadNewModel(const ModelInfo &modelInfo, QVariantMap &modelLoadProps);
 
 private:
