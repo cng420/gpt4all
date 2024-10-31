@@ -116,7 +116,6 @@ llmodel = load_llmodel_library()
 
 class LLModelPromptContext(ctypes.Structure):
     _fields_ = [
-        ("n_min_predict",  ctypes.c_int32),
         ("n_predict",      ctypes.c_int32),
         ("top_k",          ctypes.c_int32),
         ("top_p",          ctypes.c_float),
@@ -220,6 +219,12 @@ llmodel.llmodel_model_backend_name.restype = ctypes.c_char_p
 llmodel.llmodel_model_gpu_device_name.argtypes = [ctypes.c_void_p]
 llmodel.llmodel_model_gpu_device_name.restype = ctypes.c_char_p
 
+llmodel.llmodel_model_context_length.argtypes = [ctypes.c_void_p]
+llmodel.llmodel_model_context_length.restype = ctypes.c_int32
+
+llmodel.llmodel_count_prompt_tokens.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_char_p)]
+llmodel.llmodel_count_prompt_tokens.restype = ctypes.c_int32
+
 ResponseCallbackType = Callable[[int, str], bool]
 RawResponseCallbackType = Callable[[int, bytes], bool]
 EmbCancelCallbackType: TypeAlias = 'Callable[[list[int], str], bool]'
@@ -308,6 +313,19 @@ class LLModel:
             self._raise_closed()
         dev = llmodel.llmodel_model_gpu_device_name(self.model)
         return None if dev is None else dev.decode()
+
+    def count_prompt_tokens(self, prompt: str) -> int:
+        if self.model is None:
+            self._raise_closed()
+        err = ctypes.c_char_p()
+        n_tok = llmodel.llmodel_count_prompt_tokens(self.model, prompt, ctypes.byref(err))
+        if n_tok < 0:
+            s = err.value
+            errmsg = 'null' if s is None else s.decode()
+            raise RuntimeError(f'Unable to count prompt tokens: {errmsg}')
+        return n_tok
+
+    llmodel.llmodel_count_prompt_tokens.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
 
     @staticmethod
     def list_gpus(mem_required: int = 0) -> list[str]:
@@ -476,7 +494,6 @@ class LLModel:
         self.buff_expecting_cont_bytes = 0
 
         context = LLModelPromptContext(
-            n_min_predict  = 4,
             n_predict      = n_predict,
             top_k          = top_k,
             top_p          = top_p,

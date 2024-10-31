@@ -551,6 +551,13 @@ class GPT4All:
             self._history.append(MessageType(role="user", content=prompt))
             prompt = self._current_prompt_template.render(messages=self._history)
 
+        # Check request length
+        last_msg_rendered = (self._current_prompt_template.render(messages=self._history[-1])
+                             if len(self._history) > 1 else conversation)
+        last_msg_len = self.model.count_prompt_tokens(last_msg_rendered)
+        if last_msg_len > (limit := self.model.n_ctx - 4):
+            raise ValueError(f"Your message was too long and could not be processed ({last_msg_len} > {limit}).")
+
         # Send the request to the model
         if streaming:
             def stream() -> Iterator[str]:

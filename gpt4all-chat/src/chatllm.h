@@ -242,8 +242,11 @@ protected:
     PromptResult promptInternal(const QStringList &enabledCollections, const LLModel::PromptContext &ctx);
 
 private:
+    struct JinjaTemplateResult { size_t nMessages; std::string rendered; };
+
     // Applies the Jinja template. Query mode returns only the last message without special tokens.
-    std::string applyJinjaTemplate(bool query = false) const;
+    // Returns a (# of messages, rendered prompt) pair.
+    JinjaTemplateResult applyJinjaTemplate(bool onlyLastMsg = false) const;
 
     bool loadNewModel(const ModelInfo &modelInfo, QVariantMap &modelLoadProps);
 

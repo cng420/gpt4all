@@ -37,38 +37,66 @@ void LLModel::prompt(
     if (embd_inp.empty())
         throw std::invalid_argument("Prompt tokenized to zero tokens.");
 
-    if (auto res = decodePrompt(promptCallback, allowContextShift, promptCtx, embd_inp))
+    if (auto res = decodePrompt(promptCallback, allowContextShift, promptCtx, std::move(embd_inp)))
         generateResponse(responseCallback, allowContextShift, promptCtx, /*n_past*/ *res);
 }
 
+int32_t LLModel::countPromptTokens(std::string_view prompt) const
+{
+    if (!isModelLoaded())
+        throw std::invalid_argument("Attempted to tokenize with an unloaded model.");
+    return int32_t(tokenize(prompt).size());
+}
+
 auto LLModel::decodePrompt(
-    const PromptCallback     &promptCallback,
-    bool                      allowContextShift,
-    const PromptContext      &promptCtx,
-    const std::vector<Token> &embd_inp
+    const PromptCallback &promptCallback,
+    bool                  allowContextShift,
+    const PromptContext  &promptCtx,
+    std::vector<Token>    embd_inp
 ) -> std::optional<int32_t>
 {
     (void)allowContextShift;
     assert(!embd_inp.empty());
 
-    // FIXME(Adam): We should find a way to bubble these strings to the UI level to allow for translation
-    if (auto limit = contextLength() - promptCtx.n_min_predict; int32_t(embd_inp.size()) > limit) {
+    int32_t nCtx = contextLength();
+    int32_t n_batch = std::min(promptCtx.n_batch, LLMODEL_MAX_PROMPT_BATCH);
+
+    if (!allowContextShift && int32_t(embd_inp.size()) > nCtx) {
         std::ostringstream ss;
-        ss << "Your message was too long and could not be processed (" << embd_inp.size() << " > " << limit
+        ss << "Your message was too long and could not be processed (" << embd_inp.size() << " > " << nCtx
            << "). Please try again with something shorter.";
         throw std::runtime_error(ss.str());
     }
 
-    int32_t n_batch = std::min(promptCtx.n_batch, LLMODEL_MAX_PROMPT_BATCH);
-
     // Find the greatest n_past where the beginning of embd_inp matches the end of the token cache, starting at the
     // requested n_past.
     // This is used to skip unnecessary work when the prompt shares a common prefix with the previous result.
-    auto embd_inp_start = computeModelInputPosition(embd_inp);
-    auto nPast = int32_t(embd_inp_start - embd_inp.begin());
+    int32_t nPast = computeModelInputPosition(embd_inp);
 
     // always decode up to a full batch before generating, even if cached
     nPast -= std::min(n_batch, nPast);
+
+    // TODO(jared): generalize this to find the smallest new_embd_inp.size() - nPast given the cache
+    if (!nPast && int32_t(embd_inp.size()) > nCtx) {
+        // no cache hit -> shift the input before even processing
+
+        int32_t nKeep     = shouldAddBOS();
+        auto    newLength = int32_t(nCtx * (1.f - promptCtx.contextErase));
+        int32_t nDiscard  = int32_t(embd_inp.size()) - std::max(1, std::min(nCtx, newLength));
+
+        // execute the callback even for skipped tokens. this misrepresents the position of BOS but we don't care
+        auto discardedTokens = embd_inp | views::drop(nKeep) | views::take(nDiscard);
+        if (!promptCallback(discardedTokens, true))
+            return std::nullopt;
+
+        // erase nDiscard tokens
+        embd_inp.erase(discardedTokens.begin(), discardedTokens.end());
+        assert(int32_t(embd_inp.size()) <= nCtx);
+
+        // check the cache again, just in case
+        nPast = computeModelInputPosition(embd_inp);
+        nPast -= std::min(n_batch, nPast);
+    }
 
     setModelInputPosition(nPast);
 
@@ -79,15 +107,16 @@ auto LLModel::decodePrompt(
     // process the prompt in batches
     for (int32_t i = nPast; i < embd_inp.size();) {
         auto batch_end = std::min(i + n_batch, int32_t(embd_inp.size()));
-        std::span<const Token> batch(embd_inp.begin() + i, embd_inp.begin() + batch_end);
+        std::span batch(embd_inp.begin() + i, embd_inp.begin() + batch_end);
 
         // Check if the context has run out...
-        if (nPast + int32_t(batch.size()) > contextLength()) {
+        if (nPast + int32_t(batch.size()) > nCtx) {
             assert(allowContextShift);
             shiftContext(promptCtx, &nPast);
-            assert(nPast + int32_t(batch.size()) <= contextLength());
+            assert(nPast + int32_t(batch.size()) <= nCtx);
         }
 
+        // FIXME(Adam): We should find a way to bubble these strings to the UI level to allow for translation
         if (!evalTokens(nPast, batch))
             throw std::runtime_error("An internal error was encountered during prompt processing.");
 

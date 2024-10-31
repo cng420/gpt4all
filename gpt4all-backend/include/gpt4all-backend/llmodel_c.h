@@ -35,7 +35,6 @@ typedef int32_t token_t;
  * behavior.
  */
 struct llmodel_prompt_context {
-    int32_t n_min_predict;  // minimum amount of free space, less will return an error
     int32_t n_predict;      // number of tokens to predict
     int32_t top_k;          // top k logits to sample from
     float   top_p;          // nucleus sampling probability threshold
@@ -308,6 +307,8 @@ const char *llmodel_model_backend_name(llmodel_model model);
  * @return The name of the GPU device currently in use, or NULL for backends other than Kompute.
  */
 const char *llmodel_model_gpu_device_name(llmodel_model model);
+
+int32_t llmodel_count_prompt_tokens(const llmodel_model model, const char *prompt, const char **error);
 
 #ifdef __cplusplus
 }

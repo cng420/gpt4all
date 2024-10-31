@@ -51,7 +51,7 @@ public:
     int32_t contextLength() const override;
 
 protected:
-    std::vector<Token> tokenize(std::string_view str) override;
+    std::vector<Token> tokenize(std::string_view str) const override;
     bool isSpecialToken(Token id) const override;
     std::string tokenToString(Token id) const override;
     void initSampler(const PromptContext &ctx) override;
@@ -59,7 +59,7 @@ protected:
     bool evalTokens(int32_t nPast, std::span<const Token> tokens) const override;
     void shiftContext(const PromptContext &promptCtx, int32_t *nPast) override;
     int32_t inputLength() const override;
-    auto computeModelInputPosition(const std::vector<Token> &input) -> std::vector<Token>::const_iterator override;
+    int32_t computeModelInputPosition(std::span<const Token> input) const override;
     void setModelInputPosition(int32_t pos) override;
     void appendInputToken(Token tok) override;
     std::span<const Token> inputTokens() const override;

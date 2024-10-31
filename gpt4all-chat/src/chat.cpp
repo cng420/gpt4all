@@ -145,18 +145,13 @@ void Chat::newPromptResponsePair(const QString &prompt, const QList<QUrl> &attac
 
     newPromptResponsePairInternal(prompt, attachments);
 
-    this->prompt();
-}
-
-void Chat::prompt()
-{
-    resetResponseState();
     emit promptRequested(m_collections);
     m_needsSave = true;
 }
 
 void Chat::regenerateResponse()
 {
+    resetResponseState();
     emit regenerateResponseRequested();
     m_needsSave = true;
 }

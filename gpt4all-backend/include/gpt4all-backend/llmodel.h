@@ -128,7 +128,6 @@ public:
     };
 
     struct PromptContext {
-        int32_t n_min_predict = 4; // minimum amount of free space, less will throw an exception
         int32_t n_predict = 200;
         int32_t top_k = 40;
         float   top_p = 0.9f;
@@ -156,11 +155,13 @@ public:
 
     // This method requires the model to return true from supportsCompletion otherwise it will throw
     // an error
-    virtual void prompt(std::string_view        prompt,
+    virtual void prompt(std::string_view prompt,
                         const PromptCallback   &promptCallback,
                         const ResponseCallback &responseCallback,
                         const PromptContext    &ctx,
                         bool                    allowContextShift = true);
+
+    virtual int32_t countPromptTokens(std::string_view prompt) const;
 
     virtual size_t embeddingSize() const {
         throw std::logic_error(std::string(implementation().modelType()) + " does not support embeddings");
@@ -210,7 +211,7 @@ public:
 protected:
     // These are pure virtual because subclasses need to implement as the default implementation of
     // 'prompt' above calls these functions
-    virtual std::vector<Token> tokenize(std::string_view str) = 0;
+    virtual std::vector<Token> tokenize(std::string_view str) const = 0;
     virtual bool isSpecialToken(Token id) const = 0;
     virtual std::string tokenToString(Token id) const = 0;
     virtual void initSampler(const PromptContext &ctx) = 0;
@@ -218,7 +219,7 @@ protected:
     virtual bool evalTokens(int32_t nPast, std::span<const Token> tokens) const = 0;
     virtual void shiftContext(const PromptContext &promptCtx, int32_t *nPast) = 0;
     virtual int32_t inputLength() const = 0;
-    virtual auto computeModelInputPosition(const std::vector<Token> &input) -> std::vector<Token>::const_iterator = 0;
+    virtual int32_t computeModelInputPosition(std::span<const Token> input) const = 0;
     virtual void setModelInputPosition(int32_t pos) = 0;
     virtual void appendInputToken(Token tok) = 0;
     virtual std::span<const Token> inputTokens() const = 0;
@@ -249,10 +250,10 @@ protected:
     }
 
     // prefill context with prompt
-    auto decodePrompt(const PromptCallback     &promptCallback,
-                      bool                      allowContextShift,
-                      const PromptContext      &promptCtx,
-                      const std::vector<Token> &embd_inp)
+    auto decodePrompt(const PromptCallback &promptCallback,
+                      bool                  allowContextShift,
+                      const PromptContext  &promptCtx,
+                      std::vector<Token>    embd_inp)
         -> std::optional<int32_t>;
     // generate a response
     void generateResponse(const ResponseCallback &responseCallback,

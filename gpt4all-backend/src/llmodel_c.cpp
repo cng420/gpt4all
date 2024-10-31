@@ -136,7 +136,6 @@ bool llmodel_prompt(llmodel_model               model,
     auto *wrapper = static_cast<LLModelWrapper *>(model);
 
     // Copy the C prompt context
-    wrapper->promptContext.n_min_predict  = ctx->n_min_predict;
     wrapper->promptContext.n_predict      = ctx->n_predict;
     wrapper->promptContext.top_k          = ctx->top_k;
     wrapper->promptContext.top_p          = ctx->top_p;
@@ -300,4 +299,15 @@ const char *llmodel_model_gpu_device_name(llmodel_model model)
 {
     const auto *wrapper = static_cast<LLModelWrapper *>(model);
     return wrapper->llModel->gpuDeviceName();
+}
+
+int32_t llmodel_count_prompt_tokens(const llmodel_model model, const char *prompt, const char **error)
+{
+    auto *wrapper = static_cast<const LLModelWrapper *>(model);
+    try {
+        return wrapper->llModel->countPromptTokens(prompt);
+    } catch (const std::exception& e) {
+        llmodel_set_error(error, e.what());
+        return -1;
+    }
 }

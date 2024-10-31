@@ -692,18 +692,21 @@ static LLModel::PromptContext promptContextFromSettings(const ModelInfo &modelIn
 
 void ChatLLM::prompt(const QStringList &enabledCollections)
 {
-    if (!isModelLoaded())
+    if (!isModelLoaded()) {
+        emit responseStopped(0);
         return;
+    }
 
     try {
         promptInternal(enabledCollections, promptContextFromSettings(m_modelInfo));
     } catch (const std::exception &e) {
         // FIXME(jared): this is neither translated nor serialized
         emit responseChanged(e.what());
+        emit responseStopped(0);
     }
 }
 
-std::string ChatLLM::applyJinjaTemplate(bool query) const
+auto ChatLLM::applyJinjaTemplate(bool onlyLastMsg) const -> JinjaTemplateResult
 {
     Q_ASSERT(m_chatModel);
 
@@ -715,19 +718,18 @@ std::string ChatLLM::applyJinjaTemplate(bool query) const
     Q_ASSERT(items.size() >= 2); // should be prompt/response pairs
 
     jinja2::ValuesList messages;
-    // query mode uses only the previous message
-    std::span promptItems(items.begin(), query ? items.begin() + 1 : items.end() - 1);
+    // query and length check modes use only the last user message
+    std::span promptItems(onlyLastMsg ? items.end() - 2 : items.begin(), items.end() - 1);
     messages.reserve(promptItems.size());
     for (auto &item : promptItems)
         messages.emplace_back(makeMap(item));
 
+    // TODO(jared): system prompt
     jinja2::ValuesMap params {
         { "messages",              std::move(messages) },
         { "bos_token",             "<|begin_of_text|>" },
         { "eos_token",             "<|eot_id|>"        },
         { "add_generation_prompt", true                },
-        // if true, this should only return text to be embedded, without special tokens
-        { "query_mode",            query               },
     };
 
     auto promptTemplate = MySettings::globalInstance()->modelPromptTemplate(m_modelInfo);
@@ -738,7 +740,7 @@ std::string ChatLLM::applyJinjaTemplate(bool query) const
     });
     if (!maybeRendered)
         throw std::runtime_error(fmt::format("Failed to parse prompt template: {}", maybeRendered.error().ToString()));
-    return *maybeRendered;
+    return {promptItems.size(), *maybeRendered};
 }
 
 auto ChatLLM::promptInternal(const QStringList &enabledCollections, const LLModel::PromptContext &ctx) -> PromptResult
@@ -751,7 +753,13 @@ auto ChatLLM::promptInternal(const QStringList &enabledCollections, const LLMode
     QList<ResultInfo> databaseResults;
     const int retrievalSize = mySettings->localDocsRetrievalSize();
     if (!enabledCollections.isEmpty()) {
-        auto query = QString::fromStdString(applyJinjaTemplate(/*query*/ true));
+        QString query;
+        {
+            auto items = m_chatModel->chatItems(); // holds lock
+            auto prompt = items.end()[-2];
+            Q_ASSERT(prompt.name == "Prompt: "_L1);
+            query = prompt.value;
+        }
         emit requestRetrieveFromDB(enabledCollections, query, retrievalSize, &databaseResults); // blocks
         emit databaseResultsChanged(databaseResults);
     }
@@ -778,6 +786,20 @@ auto ChatLLM::promptInternal(const QStringList &enabledCollections, const LLMode
     }
 #endif
 
+    auto [nMessages, conversation] = applyJinjaTemplate();
+
+    if (!dynamic_cast<const ChatAPI *>(m_llModelInfo.model.get())) {
+        auto nCtx = m_llModelInfo.model->contextLength();
+        auto lastMessageRendered = nMessages > 1 ? applyJinjaTemplate(/*onlyLastMsg*/ true).rendered : conversation;
+        int32_t lastMessageLength = m_llModelInfo.model->countPromptTokens(lastMessageRendered);
+        if (auto limit = nCtx - 4; lastMessageLength > limit) {
+            std::ostringstream ss;
+            ss << "Your message was too long and could not be processed (" << lastMessageLength << " > " << limit
+               << "). Please try again with something shorter.";
+            throw std::runtime_error(ss.str());
+        }
+    }
+
     PromptResult result;
 
     auto handlePrompt = [this, &result](std::span<const LLModel::Token> batch, bool cached) -> bool {
@@ -797,16 +819,19 @@ auto ChatLLM::promptInternal(const QStringList &enabledCollections, const LLMode
         return !m_stopGenerating;
     };
 
-    auto conversation = applyJinjaTemplate();
-
     QElapsedTimer totalTime;
     totalTime.start();
     m_timer->start();
 
-    emit promptProcessing();
-    m_llModelInfo.model->setThreadCount(mySettings->threadCount());
-    m_stopGenerating = false;
-    m_llModelInfo.model->prompt(conversation, handlePrompt, handleResponse, ctx);
+    try {
+        emit promptProcessing();
+        m_llModelInfo.model->setThreadCount(mySettings->threadCount());
+        m_stopGenerating = false;
+        m_llModelInfo.model->prompt(conversation, handlePrompt, handleResponse, ctx, /*allowContextShift*/ true);
+    } catch (...) {
+        m_timer->stop();
+        throw;
+    }
 
     m_timer->stop();
     qint64 elapsed = totalTime.elapsed();

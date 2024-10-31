@@ -518,7 +518,7 @@ size_t LLamaModel::restoreState(std::span<const uint8_t> state, std::span<const 
     return bytesRead;
 }
 
-std::vector<LLModel::Token> LLamaModel::tokenize(std::string_view str)
+std::vector<LLModel::Token> LLamaModel::tokenize(std::string_view str) const
 {
     std::vector<LLModel::Token> fres(str.length() + 4);
     int32_t fres_len = llama_tokenize(
@@ -657,7 +657,7 @@ int32_t LLamaModel::inputLength() const
     return d_ptr->inputTokens.size();
 }
 
-auto LLamaModel::computeModelInputPosition(const std::vector<Token> &input) -> std::vector<Token>::const_iterator
+int32_t LLamaModel::computeModelInputPosition(std::span<const Token> input) const
 {
     // find common prefix
     auto cacheIt = d_ptr->inputTokens.begin();
@@ -666,7 +666,7 @@ auto LLamaModel::computeModelInputPosition(const std::vector<Token> &input) -> s
         ++cacheIt; ++inputIt;
     }
     // tell the caller to ignore the tokens between [begin, inputIt)
-    return inputIt;
+    return inputIt - input.begin();
 }
 
 void LLamaModel::setModelInputPosition(int32_t pos)

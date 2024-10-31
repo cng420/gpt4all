@@ -72,6 +72,10 @@ public:
                 const PromptContext    &ctx,
                 bool                    allowContextShift = true) override;
 
+    [[noreturn]]
+    int32_t countPromptTokens(std::string_view prompt) const override
+    { Q_UNUSED(prompt); throwNotImplemented(); }
+
     void setThreadCount(int32_t n_threads) override;
     int32_t threadCount() const override;
 
@@ -98,7 +102,7 @@ protected:
     static void throwNotImplemented() { throw std::logic_error("not implemented"); }
 
     [[noreturn]]
-    std::vector<Token> tokenize(std::string_view str) override
+    std::vector<Token> tokenize(std::string_view str) const override
     { Q_UNUSED(str); throwNotImplemented(); }
 
     [[noreturn]]
@@ -130,8 +134,7 @@ protected:
     { throwNotImplemented(); }
 
     [[noreturn]]
-    auto computeModelInputPosition(const std::vector<Token> &input)
-        -> std::vector<Token>::const_iterator override
+    int32_t computeModelInputPosition(std::span<const Token> input) const override
     { Q_UNUSED(input); throwNotImplemented(); }
 
     [[noreturn]]
