@@ -155,7 +155,7 @@ public:
 
     // This method requires the model to return true from supportsCompletion otherwise it will throw
     // an error
-    virtual void prompt(std::string_view prompt,
+    virtual void prompt(std::string_view        prompt,
                         const PromptCallback   &promptCallback,
                         const ResponseCallback &responseCallback,
                         const PromptContext    &ctx,
