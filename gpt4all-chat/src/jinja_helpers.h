@@ -3,15 +3,7 @@
 #include "chatmodel.h"
 #include "database.h"
 
-// FIXME(jared): Jinja2Cpp headers should compile with -Werror=undef
-#ifdef __GNUC__
-#   pragma GCC diagnostic push
-#   pragma GCC diagnostic ignored "-Wundef"
-#endif
 #include <jinja2cpp/value.h>
-#ifdef __GNUC__
-#   pragma GCC diagnostic pop
-#endif
 
 #include <functional>
 #include <ranges>
