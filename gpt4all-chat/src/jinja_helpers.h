@@ -27,12 +27,19 @@ template <typename T>
 using JinjaFieldMap = std::unordered_map<std::string_view, std::function<jinja2::Value (const T &)>>;
 
 template <typename Derived>
-struct JinjaComparable : jinja2::IMapItemAccessor {
+class JinjaComparable : public jinja2::IMapItemAccessor {
+public:
+    JinjaComparable() = default;
+
     bool IsEqual(const jinja2::IComparable &other) const override;
+
+private:
+    Q_DISABLE_COPY_MOVE(JinjaComparable)
 };
 
 template <typename Derived>
-struct JinjaHelper : JinjaComparable<Derived> {
+class JinjaHelper : public JinjaComparable<Derived> {
+public:
     size_t GetSize() const override
     { return Derived::s_fields.size(); }
 

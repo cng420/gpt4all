@@ -57,7 +57,6 @@
 
 using namespace Qt::Literals::StringLiterals;
 namespace ranges = std::ranges;
-namespace views = std::views;
 
 //#define DEBUG
 //#define DEBUG_MODEL_LOADING
@@ -709,7 +708,7 @@ std::string ChatLLM::applyJinjaTemplate(bool query) const
     Q_ASSERT(m_chatModel);
 
     auto makeMap = [](const ChatItem &item) {
-        return jinja2::GenericMap([msg = JinjaMessage(item)] { return &msg; });
+        return jinja2::GenericMap([msg = std::make_shared<JinjaMessage>(item)] { return msg.get(); });
     };
 
     auto items = m_chatModel->chatItems(); // holds lock
@@ -761,6 +760,7 @@ auto ChatLLM::promptInternal(const QStringList &enabledCollections, const LLMode
     QString docsContext;
     if (!databaseResults.isEmpty()) {
         QStringList results;
+        results.reserve(databaseResults.size());
         for (const ResultInfo &info : databaseResults)
             results << u"Collection: %1\nPath: %2\nExcerpt: %3"_s.arg(info.collection, info.path, info.text);
 
@@ -788,6 +788,7 @@ auto ChatLLM::promptInternal(const QStringList &enabledCollections, const LLMode
     };
 
     auto handleResponse = [this, &result](LLModel::Token token, std::string_view piece) -> bool {
+        Q_UNUSED(token);
         result.responseTokens++;
         m_timer->inc();
         result.response.append(piece.data(), piece.size());
@@ -908,7 +909,7 @@ void ChatLLM::generateName()
         return words.size() <= 3;
     };
 
-    // TODO: use Jinja template
+    // TODO(jared): use Jinja template
     auto promptTemplate = mySettings->modelPromptTemplate(m_modelInfo);
     auto promptUtf8 = chatNamePrompt.toUtf8();
     m_llModelInfo.model->prompt(
@@ -976,7 +977,7 @@ void ChatLLM::generateQuestions(qint64 elapsed)
 
     QElapsedTimer totalTime;
     totalTime.start();
-    // TODO: use Jinja template
+    // TODO(jared): use Jinja template
     auto promptUtf8 = suggestedFollowUpPrompt.toUtf8();
     m_llModelInfo.model->prompt(
         { promptUtf8.data(), size_t(promptUtf8.size()) },

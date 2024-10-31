@@ -8,6 +8,7 @@
 #include <QUrl>
 #include <QtGlobal>
 
+#include <memory>
 #include <vector>
 
 using namespace std::literals::string_view_literals;
@@ -71,13 +72,13 @@ const JinjaFieldMap<JinjaMessage> JinjaMessage::s_fields = {
     { "content", [](auto &m) { return m.item().value.toStdString(); } },
     { "sources", [](auto &m) {
         auto sources = m.item().sources | views::transform([](auto &r) {
-            return jinja2::GenericMap([map = JinjaResultInfo(r)] { return &map; });
+            return jinja2::GenericMap([map = std::make_shared<JinjaResultInfo>(r)] { return map.get(); });
         });
         return jinja2::ValuesList(sources.begin(), sources.end());
     } },
     { "prompt_attachments", [](auto &m) {
         auto attachments = m.item().promptAttachments | views::transform([](auto &pa) {
-            return jinja2::GenericMap([map = JinjaPromptAttachment(pa)] { return &map; });
+            return jinja2::GenericMap([map = std::make_shared<JinjaPromptAttachment>(pa)] { return map.get(); });
         });
         return jinja2::ValuesList(attachments.begin(), attachments.end());
     } },
