@@ -219,9 +219,6 @@ llmodel.llmodel_model_backend_name.restype = ctypes.c_char_p
 llmodel.llmodel_model_gpu_device_name.argtypes = [ctypes.c_void_p]
 llmodel.llmodel_model_gpu_device_name.restype = ctypes.c_char_p
 
-llmodel.llmodel_model_context_length.argtypes = [ctypes.c_void_p]
-llmodel.llmodel_model_context_length.restype = ctypes.c_int32
-
 llmodel.llmodel_count_prompt_tokens.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_char_p)]
 llmodel.llmodel_count_prompt_tokens.restype = ctypes.c_int32
 
