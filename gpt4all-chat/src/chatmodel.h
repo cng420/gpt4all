@@ -2,7 +2,10 @@
 #define CHATMODEL_H
 
 #include "database.h"
+#include "utils.h"
 #include "xlsxtomd.h"
+
+#include <fmt/format.h>
 
 #include <QAbstractListModel>
 #include <QBuffer>
@@ -81,6 +84,8 @@ struct ChatItem
     Q_PROPERTY(bool thumbsDownState MEMBER thumbsDownState)
 
 public:
+    enum class Type { Prompt, Response };
+
     // tags for constructing ChatItems
     struct prompt_tag_t { explicit prompt_tag_t() = default; };
     static inline constexpr prompt_tag_t prompt_tag = prompt_tag_t();
@@ -96,6 +101,15 @@ public:
 
     ChatItem(response_tag_t, int id, bool currentResponse = true)
         : id(id), name(u"Response: "_s), currentResponse(currentResponse) {}
+
+    Type type() const
+    {
+        if (name == u"Prompt: "_s)
+            return Type::Prompt;
+        if (name == u"Response: "_s)
+            return Type::Response;
+        throw std::invalid_argument(fmt::format("Chat item has unknown label: {:?}", name));
+    }
 
     QString promptPlusAttachments() const
     {
