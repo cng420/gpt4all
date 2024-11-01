@@ -49,6 +49,8 @@ public:
     explicit JinjaResultInfo(const ResultInfo &source) noexcept
         : m_source(&source) {}
 
+    ~JinjaResultInfo() override;
+
     const ResultInfo &value() const { return *m_source; }
 
     friend bool operator==(const JinjaResultInfo &a, const JinjaResultInfo &b) { return a.m_source == b.m_source; }
@@ -64,6 +66,8 @@ class JinjaPromptAttachment : public JinjaHelper<JinjaPromptAttachment> {
 public:
     explicit JinjaPromptAttachment(const PromptAttachment &attachment) noexcept
         : m_attachment(&attachment) {}
+
+    ~JinjaPromptAttachment() override;
 
     const PromptAttachment &value() const { return *m_attachment; }
 

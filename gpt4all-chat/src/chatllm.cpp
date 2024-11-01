@@ -596,7 +596,7 @@ bool ChatLLM::isModelLoaded() const
     return m_llModelInfo.model && m_llModelInfo.model->isModelLoaded();
 }
 
-QString &removeLeadingWhitespace(QString &s)
+static QString &removeLeadingWhitespace(QString &s)
 {
     auto firstNonSpace = ranges::find_if_not(s, [](auto c) { return c.isSpace(); });
     s.remove(0, firstNonSpace - s.begin());
@@ -795,14 +795,14 @@ auto ChatLLM::promptInternal(const QStringList &enabledCollections, const LLMode
     PromptResult result;
 
     auto handlePrompt = [this, &result](std::span<const LLModel::Token> batch, bool cached) -> bool {
-        Q_UNUSED(cached);
+        Q_UNUSED(cached)
         result.promptTokens += batch.size();
         m_timer->start();
         return !m_stopGenerating;
     };
 
     auto handleResponse = [this, &result](LLModel::Token token, std::string_view piece) -> bool {
-        Q_UNUSED(token);
+        Q_UNUSED(token)
         result.responseTokens++;
         m_timer->inc();
         result.response.append(piece.data(), piece.size());
@@ -917,7 +917,7 @@ void ChatLLM::generateName()
     QByteArray response; // raw UTF-8
 
     auto handleResponse = [this, &response](LLModel::Token token, std::string_view piece) -> bool {
-        Q_UNUSED(token);
+        Q_UNUSED(token)
 
         response.append(piece.data(), piece.size());
         auto respStr = QString::fromUtf8(response);
@@ -970,7 +970,7 @@ void ChatLLM::generateQuestions(qint64 elapsed)
     std::string response; // raw UTF-8
 
     auto handleResponse = [this, &response](LLModel::Token token, std::string_view piece) -> bool {
-        Q_UNUSED(token);
+        Q_UNUSED(token)
 
         // add token to buffer
         response.append(piece);

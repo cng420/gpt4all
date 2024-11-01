@@ -14,6 +14,8 @@
 using namespace std::literals::string_view_literals;
 
 
+JinjaResultInfo::~JinjaResultInfo() = default;
+
 const JinjaFieldMap<ResultInfo> JinjaResultInfo::s_fields = {
     { "collection", [](auto &s) { return s.collection.toStdString(); } },
     { "path",       [](auto &s) { return s.path      .toStdString(); } },
@@ -25,6 +27,8 @@ const JinjaFieldMap<ResultInfo> JinjaResultInfo::s_fields = {
     { "page",       [](auto &s) { return s.page;                     } },
     { "fileUri",    [](auto &s) { return s.fileUri() .toStdString(); } },
 };
+
+JinjaPromptAttachment::~JinjaPromptAttachment() = default;
 
 const JinjaFieldMap<PromptAttachment> JinjaPromptAttachment::s_fields = {
     { "url",              [](auto &s) { return s.url.toString()    .toStdString(); } },
@@ -57,7 +61,7 @@ auto JinjaMessage::keys() const -> const std::unordered_set<std::string_view> &
     switch (role()) {
         case Role::User:      return userKeys;
         case Role::Assistant: return assistantKeys;
-    };
+    }
     Q_UNREACHABLE();
 }
 
